@@ -1,0 +1,4 @@
+# The build context only needs entrypoint.sh; config/ is bind-mounted and the
+# 1.2G source tree never enters the image.
+*
+!entrypoint.sh

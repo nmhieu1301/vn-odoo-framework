@@ -1,0 +1,8 @@
+# Anchored: these must only match at the project root, not a nested addon
+# directory that happens to share the name.
+/secrets/
+/odoo/
+/addons/
+__pycache__/
+*.pyc
+.env
