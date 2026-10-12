@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Target: Odoo 20.0 Community Edition
-"""Odoo implementation of ``ILedgerRepository`` (Part 6 §7).
+"""Odoo implementation of ``ILedgerRepository``.
 
 The only module in the ledger stack that touches the ORM or SQL. It contains no
 business logic: no fiscal-year rule, no side detection, no sign handling. It
@@ -11,7 +11,7 @@ Two Odoo-specific requirements are honoured throughout:
 * ``flush()`` before raw SQL, or pending ORM writes in the current transaction
   are invisible to the cursor.
 * ``_search`` to build the WHERE clause, so record rules — multi-company above
-  all — are enforced rather than bypassed. Part 13 §10 permits SQL only under
+  all — are enforced rather than bypassed. Raw SQL is only acceptable under
   this condition. On 19.0 ``_search`` applies those rules itself; the
   ``_where_calc`` + ``_apply_ir_rules`` pair earlier branches use is gone.
 """
