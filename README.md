@@ -1,229 +1,118 @@
-# Odoo 19 — local dev stack
+# Vietnam VAS Reports for Odoo 19 Community
 
-Runs Odoo 19.0 CE **from the source tree in `./odoo`**, not from a published image.
-The image only carries system and Python dependencies; the source is bind-mounted,
-so editing it needs no rebuild.
+Vietnamese statutory accounting books, financial statements and VAT returns
+under the Vietnamese Accounting Standards (VAS), for **Odoo 19 Community
+Edition**. Supports **Circular 200 (TT200)** and **Circular 133 (TT133)**.
 
-## Layout
+Every report has an on-screen viewer (collapsible groups, filters, click through
+to the journal entry), a PDF print sharing the same QWeb template, and an Excel
+export.
 
-```
-odoo-19.0/
-├── .env                  # user, db name, ports, UID/GID — no passwords
-├── secrets/              # one file per password, mounted as Docker secrets
-├── odoo/                 # Odoo 19.0 CE source → /opt/odoo (bind mount)
-├── addons/               # → /mnt/extra-addons (bind mount)
-│   ├── custom-addons/                     # own modules
-│   ├── vn-odoo-framework/           # VN localisation framework
-│   └── oca/{account-financial-tools,reporting-engine}
-├── config/odoo.conf      # → /etc/odoo (bind mount)
-├── Dockerfile            # deps only: apt packages, wkhtmltopdf, rtlcss
-├── entrypoint.sh
-├── scripts/init-secrets.sh
-└── docker-compose.yml
-```
+## Modules
 
-Getting the source, if `./odoo` is empty:
+| Module | Depends on | Purpose |
+| --- | --- | --- |
+| `vn_core` | `account` | Reporting engines, statement mapping model. Nothing Vietnam-specific. |
+| `l10n_vn_vas_reports` | `vn_core` | Books, financial statements, VAT returns, cash vouchers, TT200/TT133 mappings |
+| `l10n_vn_stock_reports` | `stock_account` | Inventory books |
+| `l10n_vn_mrp_reports` | `mrp`, `stock_account` | Production cost reports |
+| `l10n_vn_asset_reports` | OCA `account_asset_management` | Fixed asset books |
 
-```bash
-git clone --depth 1 -b 19.0 https://github.com/odoo/odoo.git odoo
-```
+Install only what you need. A trading or services company does not have to
+install Inventory or Manufacturing to get the accounting books.
 
-Creating the secrets, if `./secrets` is empty (it is gitignored):
+## Reports
 
-```bash
-./scripts/init-secrets.sh
-```
+| Report | Form | Menu |
+| --- | --- | --- |
+| Sổ Nhật ký chung | S03a-DN | Accounting books |
+| Sổ Cái | S03b-DN | Accounting books |
+| Bảng cân đối số phát sinh | S06-DN | Accounting books |
+| Sổ chi tiết thanh toán với người mua (người bán) | S31-DN | Detail books |
+| Sổ quỹ tiền mặt / Sổ tiền gửi ngân hàng | S07-DN / S08-DN | Detail books |
+| Sổ chi tiết bán hàng | S35-DN | Detail books |
+| Sổ chi phí sản xuất, kinh doanh | S36-DN | Detail books |
+| Bảng phân bổ nguyên liệu, vật liệu, công cụ, dụng cụ | 07-VT | Detail books |
+| Công nợ phải thu / phải trả theo tuổi nợ | management | Detail books |
+| Bảng cân đối kế toán / Báo cáo tình hình tài chính | B01-DN · B01a-DNN | Financial statements |
+| Báo cáo kết quả hoạt động kinh doanh | B02-DN · B02-DNN | Financial statements |
+| Báo cáo lưu chuyển tiền tệ | B03-DN direct · B03-DNN indirect | Financial statements |
+| Bảng kê hoá đơn bán ra / mua vào | 01/GTGT annex | Tax |
+| Tờ khai thuế giá trị gia tăng | 01/GTGT | Tax |
+| Bảng tổng hợp Nhập - Xuất - Tồn | S11-DN | Inventory |
+| Thẻ kho | S12-DN | Inventory |
+| Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa | S10-DN | Inventory |
+| Báo cáo chi phí sản xuất và giá thành | management | Manufacturing |
+| Thẻ tính giá thành sản phẩm, dịch vụ | S37-DN | Manufacturing |
+| Sổ tài sản cố định / Thẻ tài sản cố định | S21-DN / S23-DN | Fixed assets |
+| Bảng tính và phân bổ khấu hao TSCĐ | 06-TSCĐ | Fixed assets |
 
-## Configuration flow
+Cash receipts and payments (**Phiếu thu 01-TT / Phiếu chi 02-TT**) print
+straight from the journal entry.
 
-`.env` sets non-secret values. Compose passes them as `PGHOST` / `PGPORT` / `PGUSER`,
-which Odoo 19 reads natively — no translation layer.
+## Installation
 
-Passwords never pass through `.env` or `odoo.conf`. Each is a file in `secrets/`,
-mounted at `/run/secrets/`, and `entrypoint.sh` converts it into the form each
-consumer expects:
-
-| Secret | Consumer | How it is delivered |
-|---|---|---|
-| `postgres_password` | postgres | `POSTGRES_PASSWORD_FILE` |
-| `postgres_password` | odoo | `.pgpass` written to tmpfs, read by libpq via `PGPASSFILE` |
-| `odoo_admin_passwd` | odoo | exported as `ODOO_ADMIN_PASSWD`, which outranks the config file |
-| `pgadmin_password` | pgadmin | `PGADMIN_DEFAULT_PASSWORD_FILE` |
-
-The database password therefore never appears in `docker inspect`, in the
-process environment, or in a config file. The master password is exported into
-the Odoo process only, so it stays out of `docker inspect` and out of
-`config/odoo.conf`.
-
-### About Docker secrets in plain Compose
-
-Outside Swarm, `secrets:` is just a bind mount of a host file into `/run/secrets/`,
-keeping the host file's owner and mode. The `uid` / `gid` / `mode` fields in a
-secret definition are ignored.
-
-The three services run as different UIDs (postgres 999, odoo 1000, pgadmin 5050),
-so the files must be world-readable. Access is restricted at the directory level
-instead — 0700 on `secrets/`, 0644 on the files. `scripts/init-secrets.sh`
-applies that and is safe to re-run.
-
-### UID / GID
-
-`UID` / `GID` in `.env` are build args. The container's `odoo` user is created with
-them so it matches the host account owning `./odoo`, `./addons` and `./secrets`.
-Check with `id -u` / `id -g`; if they differ from 1000, update `.env` and run
-`docker compose up -d --build`. The image tag carries the UID
-(`odoo19-web:uid1000`) so a changed UID cannot silently reuse the old image.
-
-Note `UID` is a read-only shell variable in bash. If your shell exports it, the
-exported value wins over `.env`.
-
-### POSTGRES_DB
-
-`POSTGRES_DB=odoo19-demo` makes postgres create an **empty** database of that name
-when the volume is first initialised. That is a postgres database, not yet an Odoo
-one — it only shows in the database picker after `-i base` has run. Since it already
-exists, the web "Create database" button reports a name clash; use the CLI.
-
-## Run
+1. Put this repository on the server and add its root folder to `addons_path`.
+   Each module is a folder at the root.
+2. For `l10n_vn_asset_reports` only: also add
+   [OCA/account-financial-tools](https://github.com/OCA/account-financial-tools)
+   and [OCA/reporting-engine](https://github.com/OCA/reporting-engine), branch
+   `19.0`. Skip this module if you don't use fixed asset accounting.
+3. Install the modules together, so the TT200 mapping data in
+   `l10n_vn_vas_reports` and the model fields in `vn_core` stay in step:
 
 ```bash
-docker compose up -d --build
-docker compose logs -f web
+odoo-bin -c odoo.conf -d YOURDB --stop-after-init \
+    -i vn_core,l10n_vn_vas_reports,l10n_vn_stock_reports,l10n_vn_mrp_reports,l10n_vn_asset_reports
 ```
 
-| Service | URL | Notes |
-|---|---|---|
-| web (odoo) | http://localhost:8069 | `admin` / `admin`, after the database is initialised |
-| db (postgres 16) | not published | reachable internally as `db` |
-| pgadmin | http://localhost:5050 | `PGADMIN_EMAIL` / `secrets/pgadmin_password` |
+When upgrading, pass the same list to `-u`. Upgrading `l10n_vn_vas_reports`
+without `vn_core` fails with
+`column "cash_expression" of relation "vn_report_mapping" does not exist`.
 
-`POSTGRES_DB` creates the `odoo19-demo` database, but postgres creates it empty —
-Odoo has to initialise it once before the web UI can serve it:
+## Demo data
 
-```bash
-docker compose run --rm web odoo -d odoo19-demo -i base --stop-after-init
-docker compose restart web
-```
+On a database created with demo data, every module loads a sample Vietnamese
+furniture company when it is installed: 22 journal entries over two fiscal
+years, VAT invoices, stock moves, a manufacturing order and fixed assets. The
+generator resolves accounts by code prefix and creates any missing ones, so it
+works with `l10n_vn` or any other chart of accounts.
 
-Add `--without-demo=all` to skip demo data. Then open http://localhost:8069 and
-log in as `admin` / `admin`. The master password (create/drop/backup a database)
-is `secrets/odoo_admin_passwd`.
+## Configuration
 
-To start over:
+* **Settings → Companies → Accounting circular**: TT200 or TT133. Financial
+  statements pick the matching layout automatically.
+* **Accounting → Configuration → Statement Mappings**: the lines of each
+  financial statement. Accounts are selected by expression (`511*`,
+  `111*,112*,-1113`) and totals by formula (`10 - 11`). Formulas are parsed, not
+  passed to `eval`. No account code is hard-coded in Python.
 
-```bash
-docker compose exec db dropdb -U odoo odoo19-demo
-docker compose exec db createdb -U odoo -O odoo odoo19-demo
-docker compose run --rm web odoo -d odoo19-demo -i base --stop-after-init
-docker compose restart web
-```
+Clicking a line of the balance sheet or income statement opens the general
+ledger for exactly the accounts behind that figure.
 
-## Working on addons
+## Known limitations
 
-`addons/` is a container of addon groups, not of modules. Each directory that
-holds modules directly is its own `addons_path` entry in `config/odoo.conf`, so
-the OCA repos are listed individually:
+* B01-DN: 12 rarely used lines have no account expression yet. They are left
+  blank rather than guessed. The report lists every account with a balance that
+  no line picks up.
+* Production cost covers direct materials only. Odoo Community does not post
+  labour or overhead to the ledger.
+* S21-DN prints the "country / year of manufacture" column blank because the
+  asset subledger does not store those fields.
 
-```
-/mnt/extra-addons/custom-addons
-/mnt/extra-addons/vn-odoo-framework
-/mnt/extra-addons/oca/account-financial-tools
-/mnt/extra-addons/oca/reporting-engine
-```
+## Compatibility
 
-Adding another group (a new OCA repo, say) means adding a line there and
-restarting `web`. Odoo does not expand globs in `addons_path`.
+| | |
+| --- | --- |
+| Odoo | 19.0 Community Edition |
+| Python | 3.10 – 3.12 |
+| PostgreSQL | 12+ |
 
-Two modules are present but not installable, because their dependencies are not
-vendored: `report_async` needs `queue_job` (OCA/queue) and `kpi` needs
-`base_external_dbsource` (OCA/server-tools). Two more need Python packages the
-image does not carry: `account_payroll_sheet_import` needs `pandas`, and
-`report_py3o` needs `py3o.template` / `py3o.formats`. Everything else in the
-51 discovered modules resolves.
+Other Odoo versions are on the branches of this repository.
 
-```bash
-# install a module
-docker compose run --rm web odoo -d odoo19-demo -i omux_backend --stop-after-init
+## License and support
 
-# update after editing python/xml
-docker compose run --rm web odoo -d odoo19-demo -u omux_backend --stop-after-init
+[AGPL-3.0](LICENSE). Copyright 2026 Manh Nguyen.
 
-# update everything
-docker compose run --rm web odoo -d odoo19-demo -u all --stop-after-init
-```
-
-Edits under `addons/` and `odoo/` are visible in the container immediately.
-`.py` / `.xml` changes still need `-u`; `.js` / `.scss` only need an asset cache
-flush (Ctrl+F5, or enable developer mode).
-
-Auto-reload on python changes (requires `workers = 0`, already set):
-
-```bash
-docker compose run --rm --service-ports web odoo -d odoo19-demo --dev=xml,reload,qweb
-```
-
-## Common commands
-
-```bash
-docker compose ps
-docker compose restart web
-docker compose down              # stop, KEEP data
-docker compose down -v           # stop and WIPE database + filestore
-docker compose exec db psql -U odoo -d postgres -c '\l'
-docker compose exec web bash
-```
-
-## Changing passwords
-
-`secrets/postgres_password` only takes effect when the db volume is first
-initialised. Afterwards, pick one:
-
-```bash
-# 1: change it in the database to match the file
-docker compose exec db psql -U odoo -d postgres -c "ALTER USER odoo WITH PASSWORD 'new_password';"
-
-# 2: wipe and start over (loses all data)
-docker compose down -v && docker compose up -d
-```
-
-`secrets/odoo_admin_passwd` and `secrets/pgadmin_password` apply on restart:
-
-```bash
-docker compose up -d --force-recreate web pgadmin
-```
-
-## Rebuilding the image
-
-Only needed when a dependency changes — never for Odoo source or addon edits.
-
-```bash
-docker compose build web && docker compose up -d
-```
-
-The apt index and downloaded `.deb`s live in BuildKit cache mounts, so a rebuild
-does not refetch them. Use `--no-cache` only to force a genuine dependency refresh.
-
-`config/odoo.conf` is not baked into the image — compose mounts `./config` over
-`/etc/odoo`, so the host copy is the only one.
-
-## pgAdmin
-
-Log in with `PGADMIN_EMAIL` from `.env` and the contents of
-`secrets/pgadmin_password`. Both are only read while the `pgadmin-data` volume is
-empty — once pgAdmin has initialised it, the credentials live in that volume and
-changing the secret has no effect.
-
-Add the server manually:
-
-| Field | Value |
-|---|---|
-| Host | `db` |
-| Port | `5432` |
-| Username | `POSTGRES_USER` from `.env` |
-| Password | contents of `secrets/postgres_password` |
-
-Reset pgAdmin to a blank state (loses all saved servers, re-reads the credentials):
-
-```bash
-docker compose stop pgadmin && docker volume rm odoo19_pgadmin-data && docker compose up -d pgadmin
-```
+Support: parabol123654@gmail.com ·
+[Issues](https://github.com/parabol123654/vn-odoo-framework/issues)

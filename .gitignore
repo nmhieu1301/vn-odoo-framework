@@ -1,8 +1,27 @@
-# Anchored: these must only match at the project root, not a nested addon
-# directory that happens to share the name.
-/secrets/
-/odoo/
-/addons/
+# Python
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Odoo
+*.log
+filestore/
+sessions/
+odoo.conf
+
+# Translations: keep .po, never commit compiled catalogs
+*.mo
+
+# Tooling
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

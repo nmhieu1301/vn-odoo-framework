@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Target: Odoo 19.0 Community Edition -->
+<odoo>
+
+    <!--
+        Demo data is generated in Python rather than declared as records here.
+        Journal entries have to reference accounts of the installed chart, and
+        those account XML IDs differ between l10n_vn, l10n_generic_coa and any
+        customised chart. The generator resolves accounts by code prefix and
+        creates what is missing, so this file works on any chart.
+    -->
+    <function model="vn.demo.data.generator" name="generate"/>
+
+</odoo>
