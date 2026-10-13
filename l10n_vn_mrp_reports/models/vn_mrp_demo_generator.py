@@ -89,6 +89,14 @@ class VnMrpDemoGenerator(models.AbstractModel):
             limit=1)
         Category = self.env['product.category']
 
+        # Odoo 20 dropped the interim input/output accounts on the category
+        # and moved the production cost account to the company as the WIP
+        # account. 154 is what that account means in the Vietnamese chart:
+        # consumption Nợ 154 / Có 152, receipt Nợ 155 / Có 154.
+        if not company.account_production_wip_account_id:
+            company.account_production_wip_account_id = \
+                self._account(company, 'input_tp')
+
         def category(name, valuation_key, input_key, output_key):
             return Category.create({
                 'name': name,
@@ -96,16 +104,6 @@ class VnMrpDemoGenerator(models.AbstractModel):
                 'property_cost_method': 'average',
                 'property_stock_valuation_account_id':
                     self._account(company, valuation_key).id,
-                'property_stock_account_input_categ_id':
-                    self._account(company, input_key).id,
-                'property_stock_account_output_categ_id':
-                    self._account(company, output_key).id,
-                # Odoo 17+ books an MO's consumption and receipt against the
-                # category's production-cost account. 154 is what that account
-                # means in the Vietnamese chart: consumption Nợ 154 / Có 152,
-                # receipt Nợ 155 / Có 154.
-                'property_stock_account_production_cost_id':
-                    self._account(company, 'input_tp').id,
                 'property_stock_journal': journal.id,
             })
 

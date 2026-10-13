@@ -93,16 +93,14 @@ class VnStockDemoGenerator(models.AbstractModel):
         Category = self.env['product.category']
 
         def category(name, valuation_key, input_key, output_key):
+            # Odoo 20 dropped the interim input/output accounts on the
+            # category; only the valuation account and journal remain.
             return Category.create({
                 'name': name,
                 'property_valuation': 'real_time',
                 'property_cost_method': 'average',
                 'property_stock_valuation_account_id':
                     self._account(company, valuation_key).id,
-                'property_stock_account_input_categ_id':
-                    self._account(company, input_key).id,
-                'property_stock_account_output_categ_id':
-                    self._account(company, output_key).id,
                 'property_stock_journal': journal.id,
             })
 

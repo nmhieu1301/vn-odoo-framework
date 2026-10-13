@@ -95,6 +95,10 @@ class VnDemoDataGenerator(models.AbstractModel):
         without piling up duplicates.
         """
         company = company or self.env.company
+        # A VAS demo company is Vietnamese; without a country the fiscal
+        # country stays empty and Odoo 20 rejects any move carrying a VN tax.
+        if not company.country_id:
+            company.country_id = self.env.ref('base.vn')
         if clear:
             self._clear(company)
 
@@ -295,8 +299,7 @@ class VnDemoDataGenerator(models.AbstractModel):
         for key, (name, vat) in PARTNERS.items():
             partner = Partner.search([('name', '=', name)], limit=1)
             if not partner:
-                partner = Partner.create({
-                    'name': name, 'company_type': 'company'})
+                partner = Partner.create({'name': name})
             # The tax code is what the Bảng kê prints; set it even on partners
             # that already existed.
             if not partner.vat:
@@ -335,6 +338,18 @@ class VnDemoDataGenerator(models.AbstractModel):
             return existing
 
         tax_account = accounts['3331'] if direction == 'sale' else accounts['133']
+        # Odoo 20 requires an explicit tax group; a bare chart has none, so
+        # find or create one named after the VAT rate.
+        TaxGroup = self.env['account.tax.group']
+        group = TaxGroup.search([
+            ('company_id', '=', company.id),
+            ('name', '=', 'VAT %d%%' % rate),
+        ], limit=1)
+        if not group:
+            group = TaxGroup.create({
+                'name': 'VAT %d%%' % rate,
+                'company_id': company.id,
+            })
         # Odoo 18 builds the repartition lines itself at create time; pointing
         # the tax lines at the right account afterwards is both simpler and
         # version-proof compared with spelling the lines out.
@@ -344,6 +359,10 @@ class VnDemoDataGenerator(models.AbstractModel):
             'amount_type': 'percent',
             'amount': rate,
             'type_tax_use': direction,
+            'tax_group_id': group.id,
+            'country_id': (company.account_fiscal_country_id
+                           or company.country_id
+                           or self.env.ref('base.vn')).id,
             'company_id': company.id,
         })
         for lines in (tax.invoice_repartition_line_ids,

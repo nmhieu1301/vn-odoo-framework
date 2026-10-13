@@ -23,7 +23,6 @@
         <field name="model">vn.expense.ledger.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_expense_ledger</field>
-        <field name="report_file">l10n_vn_vas_reports.report_expense_ledger</field>
         <field name="print_report_name">'So-chi-phi-SXKD-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -33,7 +32,6 @@
         <field name="model">vn.sales.ledger.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_sales_ledger</field>
-        <field name="report_file">l10n_vn_vas_reports.report_sales_ledger</field>
         <field name="print_report_name">'So-chi-tiet-ban-hang-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -43,7 +41,6 @@
         <field name="model">vn.material.allocation.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_material_allocation</field>
-        <field name="report_file">l10n_vn_vas_reports.report_material_allocation</field>
         <field name="print_report_name">'Bang-phan-bo-NVL-CCDC-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -53,7 +50,6 @@
         <field name="model">vn.general.ledger.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_general_ledger</field>
-        <field name="report_file">l10n_vn_vas_reports.report_general_ledger</field>
         <field name="print_report_name">'So-Cai-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -63,7 +59,6 @@
         <field name="model">vn.trial.balance.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_trial_balance</field>
-        <field name="report_file">l10n_vn_vas_reports.report_trial_balance</field>
         <field name="print_report_name">'Bang-can-doi-phat-sinh-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -73,7 +68,6 @@
         <field name="model">vn.general.journal.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_general_journal</field>
-        <field name="report_file">l10n_vn_vas_reports.report_general_journal</field>
         <field name="print_report_name">'So-Nhat-ky-chung-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -83,7 +77,6 @@
         <field name="model">vn.partner.ledger.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_partner_ledger</field>
-        <field name="report_file">l10n_vn_vas_reports.report_partner_ledger</field>
         <field name="print_report_name">'So-chi-tiet-cong-no-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -93,7 +86,6 @@
         <field name="model">vn.cash.book.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_cash_book</field>
-        <field name="report_file">l10n_vn_vas_reports.report_cash_book</field>
         <field name="print_report_name">'So-quy-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -103,7 +95,6 @@
         <field name="model">vn.aging.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_aging</field>
-        <field name="report_file">l10n_vn_vas_reports.report_aging</field>
         <field name="print_report_name">'Cong-no-theo-tuoi-no-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -113,7 +104,6 @@
         <field name="model">vn.income.statement.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_income_statement</field>
-        <field name="report_file">l10n_vn_vas_reports.report_income_statement</field>
         <field name="print_report_name">'Ket-qua-kinh-doanh-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -123,7 +113,6 @@
         <field name="model">vn.vat.listing.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_vat_listing</field>
-        <field name="report_file">l10n_vn_vas_reports.report_vat_listing</field>
         <field name="print_report_name">'Bang-ke-GTGT-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -133,7 +122,6 @@
         <field name="model">vn.balance.sheet.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_balance_sheet</field>
-        <field name="report_file">l10n_vn_vas_reports.report_balance_sheet</field>
         <field name="print_report_name">'Bang-can-doi-ke-toan-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -143,7 +131,6 @@
         <field name="model">vn.cash.flow.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_cash_flow</field>
-        <field name="report_file">l10n_vn_vas_reports.report_cash_flow</field>
         <field name="print_report_name">'Luu-chuyen-tien-te-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -153,7 +140,6 @@
         <field name="model">vn.vat.declaration.wizard</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_vat_declaration</field>
-        <field name="report_file">l10n_vn_vas_reports.report_vat_declaration</field>
         <field name="print_report_name">'To-khai-GTGT-%s' % (object.date_to)</field>
         <field name="paperformat_id" ref="paperformat_vn_book"/>
     </record>
@@ -168,7 +154,6 @@
         <field name="model">account.move</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">l10n_vn_vas_reports.report_cash_voucher</field>
-        <field name="report_file">l10n_vn_vas_reports.report_cash_voucher</field>
         <field name="print_report_name">
             (object.vn_voucher_number or object.name).replace('/', '-')
         </field>

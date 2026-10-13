@@ -12,7 +12,7 @@
     'images': ['static/description/banner.png'],
     'depends': ['account'],
     'data': [
-        'security/ir.model.access.csv',
+        'security/ir.access.csv',
         'views/vn_report_mapping_views.xml',
     ],
     'installable': True,

@@ -1,0 +1,2 @@
+id,name,model_id,group_id/id,operation,domain
+access_vn_production_cost_wizard,vn.production.cost.wizard,vn.production.cost.wizard,l10n_vn_mrp_reports.group_vn_report_manufacturing,crud,

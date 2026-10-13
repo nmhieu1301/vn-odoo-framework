@@ -20,7 +20,7 @@
     'depends': ['vn_core', 'l10n_vn_vas_reports', 'account_asset_management'],
     'data': [
         'security/vn_asset_report_groups.xml',
-        'security/ir.model.access.csv',
+        'security/ir.access.csv',
         'report/asset_report_templates.xml',
         'report/report_actions.xml',
         'views/asset_report_wizard_views.xml',

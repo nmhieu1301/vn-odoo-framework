@@ -1,0 +1,5 @@
+id,name,model_id,group_id/id,operation,domain
+access_vn_report_mapping_user,vn.report.mapping.read,vn.report.mapping,base.group_user,r,
+access_vn_report_mapping_manager,vn.report.mapping.manage,vn.report.mapping,account.group_account_manager,crud,
+access_vn_report_mapping_line_user,vn.report.mapping.line.read,vn.report.mapping.line,base.group_user,r,
+access_vn_report_mapping_line_manager,vn.report.mapping.line.manage,vn.report.mapping.line,account.group_account_manager,crud,

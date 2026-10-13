@@ -17,7 +17,7 @@
     'depends': ['vn_core', 'l10n_vn_vas_reports', 'mrp', 'stock_account'],
     'data': [
         'security/vn_mrp_report_groups.xml',
-        'security/ir.model.access.csv',
+        'security/ir.access.csv',
         'report/production_cost_templates.xml',
         'report/report_actions.xml',
         'views/production_cost_wizard_views.xml',

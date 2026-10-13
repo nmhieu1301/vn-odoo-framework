@@ -18,7 +18,7 @@
     'depends': ['vn_core', 'l10n_vn_vas_reports', 'stock_account'],
     'data': [
         'security/vn_stock_report_groups.xml',
-        'security/ir.model.access.csv',
+        'security/ir.access.csv',
         'report/stock_card_templates.xml',
         'report/report_actions.xml',
         'views/stock_card_wizard_views.xml',
