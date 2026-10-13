@@ -6,12 +6,12 @@ result up
 per product, and reports separately what is still tied up in orders that have
 not finished.
 
-**What this engine does not do.** It breaks out no direct labour and no
-production overhead. Odoo 20 adds a workcenter's cost and the order's extra
-unit cost to the value of the finished goods, and posts the labour to the
-work-in-progress account, but this engine still costs materials only: those
-amounts sit in the finished value and surface as the variance against the
-material cost rather than in columns of their own.
+**Three cost elements.** Direct materials come from the components issued;
+direct labour and production overhead from ``get_conversion_costs`` — the
+workcenter cost and the extra unit cost Odoo adds to the finished goods. Both
+are charged when an order finishes, which is when Odoo posts the labour, so
+work in progress is materials only. A repository that supplies no conversion
+costs leaves the sheet as materials only.
 
 Pure Python: no Odoo, no SQL.
 """
@@ -57,6 +57,10 @@ class ManufacturingCostEngine:
                 sum(o.material_cost for o in orders), rounding),
             output_value=round_amount(
                 sum(o.output_value for o in orders), rounding),
+            labour_cost=round_amount(
+                sum(o.labour_cost for o in orders), rounding),
+            overhead_cost=round_amount(
+                sum(o.overhead_cost for o in orders), rounding),
             work_in_progress=work_in_progress,
             open_order_count=open_count,
             currency=currency,
@@ -74,7 +78,9 @@ class ManufacturingCostEngine:
         variance, or consumption recorded outside the period — instead of
         hiding it.
 
-        Direct materials only, for the reason given at the top of this module.
+        Costs incurred are split into materials, labour and overhead; labour
+        and overhead belong to the orders finished in the period, as explained
+        at the top of this module.
         """
         self._validate(manufacturing_filter)
         currency = self._repo.get_currency(manufacturing_filter.company_ids)
@@ -106,6 +112,8 @@ class ManufacturingCostEngine:
             tuple(p.id for p in open_at_end),
             date_to=manufacturing_filter.date_to) if open_at_end else {}
         outputs = self._repo.get_outputs(tuple(p.id for p in finished))
+        conversion = self._repo.get_conversion_costs(
+            tuple(p.id for p in finished)) if finished else {}
 
         buckets = {}
         for production in everything.values():
@@ -113,7 +121,7 @@ class ManufacturingCostEngine:
             bucket = buckets.setdefault(product.id, {
                 'product': product, 'opening': 0.0, 'period': 0.0,
                 'value': 0.0, 'quantity': 0.0, 'closing': 0.0,
-                'finished': 0, 'open': 0})
+                'labour': 0.0, 'overhead': 0.0, 'finished': 0, 'open': 0})
             bucket['period'] += period_costs.get(production.id, 0.0)
         for production in open_at_start:
             buckets[production.product.id]['opening'] += opening_costs.get(
@@ -127,6 +135,9 @@ class ManufacturingCostEngine:
             bucket = buckets[production.product.id]
             bucket['quantity'] += quantity
             bucket['value'] += value
+            labour, overhead = conversion.get(production.id, (0.0, 0.0))
+            bucket['labour'] += labour
+            bucket['overhead'] += overhead
             bucket['finished'] += 1
 
         rows = [
@@ -140,11 +151,13 @@ class ManufacturingCostEngine:
                 closing_wip=round_amount(bucket['closing'], rounding),
                 finished_order_count=bucket['finished'],
                 open_order_count=bucket['open'],
+                period_labour=round_amount(bucket['labour'], rounding),
+                period_overhead=round_amount(bucket['overhead'], rounding),
             )
             for bucket in buckets.values()
         ]
         rows = [row for row in rows if any((
-            row.opening_wip, row.period_cost, row.finished_value,
+            row.opening_wip, row.period_total, row.finished_value,
             row.closing_wip))]
         rows.sort(key=lambda r: (r.product.code or '', r.product.name))
 
@@ -158,6 +171,10 @@ class ManufacturingCostEngine:
                 sum(r.finished_value for r in rows), rounding),
             total_closing_wip=round_amount(
                 sum(r.closing_wip for r in rows), rounding),
+            total_period_labour=round_amount(
+                sum(r.period_labour for r in rows), rounding),
+            total_period_overhead=round_amount(
+                sum(r.period_overhead for r in rows), rounding),
             currency=currency,
             date_from=manufacturing_filter.date_from,
             date_to=manufacturing_filter.date_to,
@@ -180,16 +197,20 @@ class ManufacturingCostEngine:
             return ()
         materials = self._repo.get_material_costs(ids)
         outputs = self._repo.get_outputs(ids)
+        conversion = self._repo.get_conversion_costs(ids)
 
         orders = []
         for production in productions:
             quantity, value = outputs.get(production.id, (0.0, 0.0))
+            labour, overhead = conversion.get(production.id, (0.0, 0.0))
             orders.append(ProductionCostDTO(
                 production=production,
                 material_cost=round_amount(
                     materials.get(production.id, 0.0), rounding),
                 output_quantity=round_amount(quantity, QUANTITY_ROUNDING),
                 output_value=round_amount(value, rounding),
+                labour_cost=round_amount(labour, rounding),
+                overhead_cost=round_amount(overhead, rounding),
             ))
         orders.sort(key=lambda o: (o.production.date_finished or o.production.name,
                                    o.production.name))
@@ -202,11 +223,14 @@ class ManufacturingCostEngine:
             product = order.production.product
             bucket = buckets.setdefault(product.id, {
                 'product': product, 'count': 0,
-                'material': 0.0, 'quantity': 0.0, 'value': 0.0})
+                'material': 0.0, 'quantity': 0.0, 'value': 0.0,
+                'labour': 0.0, 'overhead': 0.0})
             bucket['count'] += 1
             bucket['material'] += order.material_cost
             bucket['quantity'] += order.output_quantity
             bucket['value'] += order.output_value
+            bucket['labour'] += order.labour_cost
+            bucket['overhead'] += order.overhead_cost
 
         summaries = [
             ProductCostSummaryDTO(
@@ -216,6 +240,8 @@ class ManufacturingCostEngine:
                 output_quantity=round_amount(bucket['quantity'],
                                              QUANTITY_ROUNDING),
                 output_value=round_amount(bucket['value'], rounding),
+                labour_cost=round_amount(bucket['labour'], rounding),
+                overhead_cost=round_amount(bucket['overhead'], rounding),
             )
             for bucket in buckets.values()
         ]
@@ -227,8 +253,8 @@ class ManufacturingCostEngine:
 
         Derived from the components already consumed by orders still open.
         When the production location carries the work-in-progress account,
-        Odoo 20 posts that consumption to 154, so this is the material part of
-        that balance.
+        Odoo 20 posts that consumption to 154; labour reaches 154 only when the
+        order finishes, so for open orders this is the whole of it.
         """
         open_orders = self._repo.get_productions(manufacturing_filter,
                                                  done=False)

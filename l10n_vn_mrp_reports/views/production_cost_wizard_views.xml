@@ -29,11 +29,12 @@
                 </group>
 
                 <div class="text-muted" colspan="2">
-                    Direct materials only, taken from the value of the
-                    components issued to each order. Odoo 20 also adds
-                    workcenter costs and the order's extra unit cost to the
-                    finished goods, so those show as the difference between the
-                    finished value and the material cost.
+                    Split into direct materials (the components issued),
+                    direct labour (the operations' workcenter cost) and
+                    production overhead (the order's extra unit cost): the
+                    three amounts Odoo adds up to value the finished goods.
+                    Labour and overhead are charged when an order finishes,
+                    so work in progress is materials only.
                 </div>
 
                 <footer>

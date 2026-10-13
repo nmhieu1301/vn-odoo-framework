@@ -173,6 +173,31 @@ class OdooManufacturingRepository(IManufacturingRepository, BaseRepository):
                                        row['value'] or 0.0)
                 for row in self.cr.dictfetchall()}
 
+    def get_conversion_costs(self, production_ids):
+        """Labour and overhead, as ``mrp.production._cal_price`` adds them.
+
+        When an order finishes Odoo values the finished goods at the
+        components plus ``mrp.workorder._cal_cost()`` of every operation plus
+        ``extra_cost`` per unit produced, and ``_post_labour`` posts the first
+        of those (rounded per operation) to the work-in-progress account. Both
+        are read from the same sources here, so the three elements add up to
+        the value Odoo capitalised.
+        """
+        result = {}
+        for production in self.env['mrp.production'].browse(production_ids):
+            currency = production.company_id.currency_id
+            labour = sum(currency.round(workorder._cal_cost())
+                         for workorder in production.workorder_ids)
+            finished = production.move_finished_ids.filtered(
+                lambda move: move.product_id == production.product_id
+                and move.state == 'done')
+            quantity = sum(finished.move_line_ids.filtered('picked').mapped(
+                'quantity_product_uom'))
+            overhead = currency.round(production.extra_cost * quantity)
+            if labour or overhead:
+                result[production.id] = (labour, overhead)
+        return result
+
     def _flush(self):
         self.env['stock.move'].flush_model()
         self.env['stock.move.line'].flush_model()
