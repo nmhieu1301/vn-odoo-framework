@@ -4,7 +4,9 @@
 
 Cost and quantity both come from the stock moves a manufacturing order owns.
 Odoo 20 has no ``stock.valuation.layer``; the value a move took into or out of
-stock is ``stock_move.value``, signed the way the layer used to be:
+stock is ``stock_move.value``. Odoo 19 stores it unsigned and lets ``is_out``
+give the direction, Odoo 20 stores an issue negative; the queries below sign
+it from ``is_out`` either way, as the layer was:
 
 * components carry ``stock_move.raw_material_production_id``; their value is
   negative because it left stock, so the material cost is the negated sum;
@@ -135,7 +137,8 @@ class OdooManufacturingRepository(IManufacturingRepository, BaseRepository):
             params.append('%s 23:59:59' % odoo_fields.Date.to_string(date_to))
         self.cr.execute("""
             SELECT sm.raw_material_production_id  AS production_id,
-                   COALESCE(SUM(sm.value), 0.0)   AS value
+                   COALESCE(SUM(CASE WHEN sm.is_out THEN -ABS(sm.value) ELSE sm.value END), 0.0)
+                                                  AS value
               FROM stock_move sm
              WHERE sm.raw_material_production_id IN %%s
                AND sm.state = 'done' AND (sm.is_in OR sm.is_out)%s
@@ -159,7 +162,8 @@ class OdooManufacturingRepository(IManufacturingRepository, BaseRepository):
                          WHERE sml.move_id = sm.id AND sml.picked)
                        * CASE WHEN sm.is_out THEN -1 ELSE 1 END), 0.0)
                                                       AS quantity,
-                   COALESCE(SUM(sm.value), 0.0)       AS value
+                   COALESCE(SUM(CASE WHEN sm.is_out THEN -ABS(sm.value) ELSE sm.value END), 0.0)
+                                                  AS value
               FROM stock_move sm
              WHERE sm.production_id IN %s
                AND sm.state = 'done' AND (sm.is_in OR sm.is_out)

@@ -2,31 +2,37 @@
 # Target: Odoo 20.0 Community Edition
 """Odoo implementation of ``IInventoryRepository``.
 
-Odoo 20 has no ``stock.valuation.layer``. The value of a movement now lives on
-the ``stock.move`` itself: ``value`` is what the move brought into or took out
-of stock, positive on a receipt and negative on an issue, exactly the sign the
-layer used to carry; ``is_in`` and ``is_out`` say whether the move crossed the
-boundary of the company's valued locations at all. The report values stock the
-way Odoo does, so its closing figures are the ones Odoo shows for the date.
+Odoo 20 has no ``stock.valuation.layer``. The value of a movement now lives
+on the ``stock.move`` itself: ``value`` is what the move brought into or took
+out of stock; ``is_in`` and ``is_out`` say whether the move crossed
+the boundary of the company's valued locations at all. The report values stock
+the way Odoo does, so its closing figures are the ones Odoo shows for the date.
+
+**Sign.** Odoo 19 stores ``value`` unsigned and lets ``is_out`` give the
+direction; Odoo 20 stores an issue's value negative. The report signs it
+from ``is_out`` either way, so receipts add and issues subtract on both.
 
 **Quantity.** A move's quantity is in its own unit of measure, and only the
 lines actually picked were valued. The quantity is therefore the sum of
 ``stock.move.line.quantity_product_uom`` over picked lines, signed like the
 value.
 
-**Average and FIFO cost.** The moves' ``value`` is the valuation. When such a
-product's cost is corrected, Odoo 20 rewrites the value of the receipts still
-in stock rather than recording a separate revaluation, so the correction shows
-in those receipts and needs no line of its own.
+**Cost changes.** A change of cost made outside a movement is recorded on
+``product.value`` with no move, and Odoo's valuation at a date restarts from
+it (``_get_last_product_value``):
 
-**Standard cost.** For a product at standard cost Odoo 20 ignores the moves'
-values: the stock is worth its quantity at the standard price in force on the
-date, that price being the last cost change (``product.value`` with no move)
-on or before it, or the current cost if there is none. The report follows the
-same rule: opening stock and every movement of such a product are valued at
-the price of their date, and each cost change inside the period becomes a
-value-only line, the quantity on hand times the difference. Opening plus
-movements then lands exactly on Odoo's own closing value.
+* standard cost — the stock is worth its quantity at the price in force on the
+  date: the last such change on or before it, or the current cost if there is
+  none. Opening stock and every movement are valued at that price, and each
+  change inside the period is a value-only line, quantity on hand times the
+  difference;
+* average cost — the value is reset to the new cost times the quantity then on
+  hand, and later movements add their own values. Each change is a value-only
+  line for the difference between that reset and the value it replaced.
+
+Both are computed as "target minus what the report already had", so a change
+Odoo also wrote into the moves themselves is never counted twice. FIFO
+products need neither: their moves carry the valuation.
 
 **Which date a movement belongs to.** ``stock.move.date``, the date the move
 was done.
@@ -46,6 +52,11 @@ from odoo.addons.vn_core.infrastructure.base_repository import BaseRepository
 MOVE = 'stock.move'
 #: One microsecond: "just before" a timestamp.
 INSTANT = timedelta(microseconds=1)
+#: The move's value, negative on an issue whichever way Odoo stored it.
+SIGNED_VALUE = ('(CASE WHEN "stock_move".is_out THEN -ABS("stock_move".value)'
+                ' ELSE "stock_move".value END)')
+#: Cost methods whose valuation restarts at a manual cost change.
+REPLAYED = ('standard', 'average')
 
 
 class OdooInventoryRepository(IInventoryRepository, BaseRepository):
@@ -77,25 +88,17 @@ class OdooInventoryRepository(IInventoryRepository, BaseRepository):
         if not inventory_filter.date_from:
             return {}
         start = odoo_fields.Date.to_string(inventory_filter.date_from)
-        move_from, move_where, move_params = self._move_query(inventory_filter)
-        self.cr.execute("""
-            SELECT "stock_move".product_id         AS product_id,
-                   SUM({qty})                      AS quantity,
-                   SUM("stock_move".value)         AS value
-              FROM {move_from}
-             WHERE {move_where}
-               AND "stock_move".date < %s
-          GROUP BY "stock_move".product_id
-        """.format(qty=self._signed_qty_expr(), move_from=move_from,
-                   move_where=move_where), move_params + [start])
-        balances = {row['product_id']: [row['quantity'] or 0.0, row['value'] or 0.0]
-                    for row in self.cr.dictfetchall()}
+        rows = self._moves(inventory_filter, before=start)
+        balances = {}
+        for row in rows:
+            balance = balances.setdefault(row['product_id'], [0.0, 0.0])
+            balance[0] += row['quantity'] or 0.0
+            balance[1] += row['value'] or 0.0
 
-        prices = self._standard_prices(inventory_filter)
-        before = odoo_fields.Datetime.to_datetime(start) - INSTANT
-        for product_id, balance in balances.items():
-            if product_id in prices:
-                balance[1] = balance[0] * prices[product_id].at(before)
+        replay = self._replay(inventory_filter,
+                              odoo_fields.Datetime.to_datetime(start) - INSTANT)
+        for product_id, state in replay.items():
+            balances.setdefault(product_id, [0.0, 0.0])[1] = state['value']
         return {product_id: InventoryBalanceDTO(quantity, value)
                 for product_id, (quantity, value) in balances.items()}
 
@@ -106,49 +109,22 @@ class OdooInventoryRepository(IInventoryRepository, BaseRepository):
         # Dates are timestamps, so a bare date here means midnight and
         # silently drops everything that moved during the closing day itself.
         upper = '%s 23:59:59' % odoo_fields.Date.to_string(inventory_filter.date_to)
+        low = odoo_fields.Datetime.to_datetime(lower) if lower else None
+        high = odoo_fields.Datetime.to_datetime(upper)
 
-        move_from, move_where, move_params = self._move_query(inventory_filter)
-        bounds, bound_params = '"stock_move".date <= %s', [upper]
-        if lower:
-            bounds += ' AND "stock_move".date >= %s'
-            bound_params.append(lower)
-
-        # "TK đối ứng" for S10-DN: the accounts on the other side of the
-        # journal entry Odoo posted for the move. The stock account sits on the
-        # same side as the value's sign — debit on a receipt, credit on an
-        # issue — so the counterpart is whatever the entry carries opposite.
-        # Odoo 20 only posts such an entry when a location carries a valuation
-        # account (production, inventory adjustment, scrap); receipts and
-        # deliveries reach the ledger through their bills and invoices, so
-        # those lines print no counterpart.
-        counterpart_expr = """
-            (SELECT string_agg(
-                        DISTINCT aa.code_store->>(aml.company_id::text), ', ')
-               FROM account_move_line aml
-               JOIN account_account aa ON aa.id = aml.account_id
-              WHERE aml.move_id = "stock_move".account_move_id
-                AND CASE WHEN "stock_move".value >= 0
-                         THEN aml.credit ELSE aml.debit END > 0)
-        """
-        self.cr.execute("""
-            SELECT "stock_move".id                   AS id,
-                   "stock_move".date                 AS move_date,
-                   "stock_move".product_id           AS product_id,
-                   {qty}                             AS quantity,
-                   "stock_move".value                AS value,
-                   "stock_move".reference            AS reference,
-                   rp.name                           AS partner_name,
-                   {counterpart}                     AS counterpart
-              FROM {move_from}
-              LEFT JOIN stock_picking sp ON sp.id = "stock_move".picking_id
-              LEFT JOIN res_partner rp ON rp.id = sp.partner_id
-             WHERE {move_where}
-               AND {bounds}
-        """.format(qty=self._signed_qty_expr(), counterpart=counterpart_expr,
-                   move_from=move_from, move_where=move_where, bounds=bounds),
-            move_params + bound_params)
-        rows = [dict(row) for row in self.cr.dictfetchall()]
-        rows = self._apply_standard_prices(inventory_filter, rows, lower, upper)
+        rows = self._moves(inventory_filter, after=lower, until=upper,
+                           details=True)
+        replay = self._replay(inventory_filter, high, low)
+        revalued = {}
+        for state in replay.values():
+            revalued.update(state['moves'])
+        for row in rows:
+            if row['id'] in revalued:
+                row['value'] = revalued[row['id']]
+        for state in replay.values():
+            rows.extend(state['changes'])
+        # A cost change at the very moment of a move counts after it.
+        rows.sort(key=lambda row: (row['move_date'], row['id'] < 0, abs(row['id'])))
 
         names = {product.id: product.name or '' for product in
                  self.env['product.product'].browse(
@@ -179,54 +155,70 @@ class OdooInventoryRepository(IInventoryRepository, BaseRepository):
         )
 
     # ------------------------------------------------------------------
-    def _apply_standard_prices(self, inventory_filter, rows, lower, upper):
-        """Revalue standard-cost rows at the price of their date.
+    def _replay(self, inventory_filter, until, period_start=None):
+        """Odoo's valuation of standard and average products, replayed.
 
-        Adds one value-only row per cost change inside the period. Its id is
-        the negated ``product.value`` id, so it cannot collide with a move.
+        -> ``{product_id: {'value', 'moves', 'changes'}}`` as of ``until``:
+        the stock value then; the value of each move dated on or after
+        ``period_start`` where it differs from ``stock_move.value``
+        (standard cost); and the value-only rows of the cost changes dated on
+        or after ``period_start``. Each change row's id is the negated
+        ``product.value`` id, so it cannot collide with a move.
         """
-        prices = self._standard_prices(inventory_filter)
-        if prices:
-            on_hand = {}
-            if lower:
-                on_hand = {product_id: balance.quantity for product_id, balance
-                           in self.get_opening(inventory_filter).items()}
-            for row in rows:
-                history = prices.get(row['product_id'])
-                if history:
-                    row['value'] = (row['quantity'] or 0.0) * history.at(row['move_date'])
-            low = odoo_fields.Datetime.to_datetime(lower) if lower else None
-            high = odoo_fields.Datetime.to_datetime(upper)
-            for product_id, history in prices.items():
-                for change in history.changes:
-                    if change['date'] > high or (low and change['date'] < low):
-                        continue
-                    quantity = on_hand.get(product_id, 0.0) + sum(
-                        row['quantity'] or 0.0 for row in rows
-                        if row['product_id'] == product_id and row['id'] > 0
-                        and row['move_date'] <= change['date'])
-                    previous = history.at(change['date'] - INSTANT)
-                    if not quantity or change['price'] == previous:
-                        continue
-                    rows.append({
-                        'id': -change['id'],
-                        'move_date': change['date'],
+        histories = self._cost_histories(inventory_filter)
+        if not histories:
+            return {}
+        rows = self._moves(inventory_filter, until=until, product_ids=list(histories))
+        by_product = {}
+        for row in rows:
+            by_product.setdefault(row['product_id'], []).append(row)
+
+        result = {}
+        for product_id, history in histories.items():
+            events = [(row['move_date'], 0, row) for row in by_product.get(product_id, ())]
+            events += [(change['date'], 1, change) for change in history['changes']
+                       if change['date'] <= until]
+            events.sort(key=lambda event: (event[0], event[1], event[2]['id']))
+            quantity = value = 0.0
+            moves, changes = {}, []
+            for when, kind, item in events:
+                in_period = period_start is None or when >= period_start
+                if kind == 0:
+                    move_qty = item['quantity'] or 0.0
+                    if history['method'] == 'standard':
+                        move_value = move_qty * history['price'].at(when)
+                        if in_period:
+                            moves[item['id']] = move_value
+                    else:
+                        move_value = item['value'] or 0.0
+                    quantity += move_qty
+                    value += move_value
+                    continue
+                # Both methods restart from the new cost times what is on hand.
+                target = quantity * item['price']
+                if in_period and quantity and target != value:
+                    changes.append({
+                        'id': -item['id'],
+                        'move_date': when,
                         'product_id': product_id,
                         'quantity': 0.0,
-                        'value': quantity * (change['price'] - previous),
-                        'description': change['description'],
+                        'value': target - value,
+                        'description': item['description'],
                     })
-        # A cost change at the very moment of a move counts after it.
-        return sorted(rows, key=lambda row: (row['move_date'], row['id'] < 0,
-                                             abs(row['id'])))
+                value = target
+            if history['method'] == 'standard':
+                # Before any change, Odoo values at the current cost.
+                value = quantity * history['price'].at(until)
+            result[product_id] = {'value': value, 'moves': moves, 'changes': changes}
+        return result
 
-    def _standard_prices(self, inventory_filter):
-        """``{product_id: _PriceHistory}`` for the standard-cost products."""
+    def _cost_histories(self, inventory_filter):
+        """Standard and average products, with their manual cost changes."""
         company = (self.env['res.company'].browse(list(inventory_filter.company_ids))[:1]
                    or self.env.company)
         products = self.env['product.product'].with_company(company).search(
             self._product_domain(inventory_filter)).filtered(
-                lambda product: product.cost_method == 'standard'
+                lambda product: product.cost_method in REPLAYED
                 and not product.lot_valuated)
         if not products:
             return {}
@@ -239,11 +231,76 @@ class OdooInventoryRepository(IInventoryRepository, BaseRepository):
                 'id': record.id, 'date': record.date, 'price': record.value,
                 'description': record.description or '',
             })
-        return {product.id: _PriceHistory(product.standard_price,
-                                          changes.get(product.id, []))
-                for product in products}
+        histories = {}
+        for product in products:
+            product_changes = changes.get(product.id, [])
+            # An average product without a manual change is just its moves.
+            if product.cost_method == 'average' and not product_changes:
+                continue
+            histories[product.id] = {
+                'method': product.cost_method,
+                'changes': product_changes,
+                'price': _PriceHistory(product.standard_price, product_changes),
+            }
+        return histories
 
     # ------------------------------------------------------------------
+    def _moves(self, inventory_filter, before=None, after=None, until=None,
+               product_ids=None, details=False):
+        """Valued moves as dicts, oldest first.
+
+        ``before`` is exclusive, ``after`` and ``until`` inclusive. ``details``
+        adds the reference, partner and "TK đối ứng".
+        """
+        move_from, move_where, params = self._move_query(inventory_filter)
+        bounds = []
+        for clause, value in (('<', before), ('>=', after), ('<=', until)):
+            if value:
+                bounds.append('"stock_move".date %s %%s' % clause)
+                params.append(value)
+        if product_ids is not None:
+            bounds.append('"stock_move".product_id IN %s')
+            params.append(tuple(product_ids) or (0,))
+
+        extra, joins = '', ''
+        if details:
+            # "TK đối ứng" for S10-DN: the accounts on the other side of the
+            # journal entry Odoo posted for the move. The stock account sits on
+            # the same side as the value's sign — debit on a receipt, credit on
+            # an issue — so the counterpart is whatever the entry carries
+            # opposite. Odoo only posts such an entry when a location carries a
+            # valuation account (production, inventory adjustment, scrap);
+            # receipts and deliveries reach the ledger through their bills and
+            # invoices, so those lines print no counterpart.
+            extra = """,
+                   "stock_move".reference            AS reference,
+                   rp.name                           AS partner_name,
+                   (SELECT string_agg(
+                               DISTINCT aa.code_store->>(aml.company_id::text), ', ')
+                      FROM account_move_line aml
+                      JOIN account_account aa ON aa.id = aml.account_id
+                     WHERE aml.move_id = "stock_move".account_move_id
+                       AND CASE WHEN "stock_move".is_out
+                                THEN aml.debit ELSE aml.credit END > 0)
+                                                     AS counterpart"""
+            joins = """
+              LEFT JOIN stock_picking sp ON sp.id = "stock_move".picking_id
+              LEFT JOIN res_partner rp ON rp.id = sp.partner_id"""
+        self.cr.execute("""
+            SELECT "stock_move".id                   AS id,
+                   "stock_move".date                 AS move_date,
+                   "stock_move".product_id           AS product_id,
+                   {qty}                             AS quantity,
+                   {value}                           AS value{extra}
+              FROM {move_from}{joins}
+             WHERE {move_where}{bounds}
+          ORDER BY "stock_move".date, "stock_move".id
+        """.format(qty=self._signed_qty_expr(), value=SIGNED_VALUE,
+                   extra=extra, joins=joins,
+                   move_from=move_from, move_where=move_where,
+                   bounds=''.join(' AND ' + bound for bound in bounds)), params)
+        return [dict(row) for row in self.cr.dictfetchall()]
+
     @staticmethod
     def _signed_qty_expr():
         """Picked quantity in the product's unit, negative on an issue."""
@@ -287,10 +344,10 @@ class OdooInventoryRepository(IInventoryRepository, BaseRepository):
 
 
 class _PriceHistory:
-    """Standard price in force at a moment, by Odoo 20's rule.
+    """Standard price in force at a moment, by Odoo's rule.
 
     The last cost change on or before it; the current cost when there is none
-    (``product.product._get_last_product_value`` and ``_run_standard``).
+    (``product.product._get_last_product_value``).
     """
 
     def __init__(self, current, changes):
