@@ -7,7 +7,7 @@
         giá thành) và chi tiết theo từng lệnh sản xuất.
 
         Ghi chú ở cuối không phải để trang trí. Báo cáo này **không có** chi phí
-        nhân công trực tiếp và sản xuất chung, vì Odoo 14 CE không hạch toán
+        nhân công trực tiếp và sản xuất chung, vì Odoo 18 CE không hạch toán
         chúng vào sổ. In một con số thống kê cạnh một con số đã vào sổ mà không
         nói rõ cái nào là cái nào thì tệ hơn là không in.
     -->
@@ -32,7 +32,7 @@
             <span t-out="report.work_in_progress"
                   t-options="{'widget': 'monetary', 'display_currency': currency}"/>
             — vật tư đã xuất cho <t t-out="report.open_order_count"/> lệnh sản
-            xuất chưa hoàn thành tại ngày báo cáo. Odoo 14 Community không có tài
+            xuất chưa hoàn thành tại ngày báo cáo. Odoo 18 Community không có tài
             khoản sản phẩm dở dang, nên con số này không nằm ở đâu trong sổ; nó
             được suy ra từ chính các lệnh đó để đối chiếu với số dư TK 154.
         </div>
@@ -146,7 +146,7 @@
     <!--
         Mẫu S37-DN chia mỗi chỉ tiêu theo ba khoản mục: NVL trực tiếp, nhân
         công trực tiếp, sản xuất chung. Ở đây chỉ có cột NVL trực tiếp — hai
-        khoản mục kia Odoo 14 CE không hạch toán vào sổ (xem ghi chú phạm vi),
+        khoản mục kia Odoo 18 CE không hạch toán vào sổ (xem ghi chú phạm vi),
         nên in số 0 cho chúng sẽ là khẳng định sai, còn in số thống kê sẽ là
         trộn số ngoài sổ vào một tờ thẻ đối chiếu được với TK 154 và 155.
 

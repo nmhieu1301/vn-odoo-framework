@@ -8,14 +8,14 @@ about accounting: which columns a report has and what goes in them is decided in
 report — sixteen reports share seven shapes, which is the reuse the DTOs were
 for.
 
-**On the xlsxwriter version.** Odoo 14 pins ``XlsxWriter==1.1.2``, which is
-from 2018. Anything newer may be present on a given server but must never be
-required: every call outside that baseline is feature-detected, and the workbook
-is still correct without it — only less polished. It has to stay
-that way, because the failure otherwise appears at the moment a user clicks
-Export rather than at install.
+**On the xlsxwriter version.** Odoo 18 pins ``XlsxWriter==3.0.2`` (3.1.9 on
+Python 3.12). Anything newer may be present on a given server but must never be
+required: every call outside that baseline is feature-detected, and the
+workbook is still correct without it — only less polished. It has to stay that
+way, because the failure otherwise appears at the moment a user clicks Export
+rather than at install.
 
-**On OCA report_xlsx.** Not used, and not needed: Odoo 14 already ships
+**On OCA report_xlsx.** Not used, and not needed: Odoo 18 already ships
 ``xlsxwriter`` for its own list-view export, so the workbook can be built with
 no dependency beyond the server itself.
 
@@ -63,7 +63,7 @@ class VnXlsxWriter:
         """-> ``bytes`` of an xlsx workbook."""
         if xlsxwriter is None:                       # pragma: no cover
             raise RuntimeError(
-                'xlsxwriter is not installed; it ships with Odoo 14.')
+                'xlsxwriter is not installed; it ships with Odoo 18.')
 
         stream = io.BytesIO()
         book = xlsxwriter.Workbook(stream, {
@@ -182,10 +182,11 @@ class VnXlsxWriter:
         of them. On a ledger that is a warning triangle against thousands of
         rows, which trains the reader to ignore warnings generally.
 
-        ``ignore_errors`` arrived in XlsxWriter 3.0 while Odoo 14 pins 1.1.2, so
-        the call is feature-detected. Without it the triangles come back; the
-        figures do not change, and an export that works with a cosmetic blemish
-        beats one that raises.
+        ``ignore_errors`` arrived in XlsxWriter 3.0, which a stock Odoo 18 has.
+        The call stays feature-detected anyway, for the server whose wheel
+        predates its Odoo. Without it the triangles come back; the figures do
+        not change, and an export that works with a cosmetic blemish beats one
+        that raises.
         """
         if last_row <= first_row or xl_col_to_name is None:
             return
