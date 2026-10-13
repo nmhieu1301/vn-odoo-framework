@@ -57,8 +57,9 @@ class BaseService:
         if result.success:
             return result
         message = '\n'.join(result.errors)
-        # Odoo 14's _() takes the source string only; the multi-argument
-        # form arrives in 16.0. Interpolate after translating.
+        # Odoo 18's _() does accept interpolation arguments, but the
+        # .po files across this project were extracted with the source
+        # string alone. Interpolating after keeps one convention.
         raise UserError(
             _('%s could not be produced:\n%s') % (self.name, message))
 
