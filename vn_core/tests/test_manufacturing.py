@@ -172,7 +172,7 @@ class TestProductSummary(ManufacturingCase):
 
 
 class TestWorkInProgress(ManufacturingCase):
-    """Odoo 20 CE has no WIP account, so this figure exists nowhere in the ledger."""
+    """Materials consumed by orders still open: the material part of 154."""
 
     done = (_mo(1, BAN_AN),)
     open_orders = (_mo(9, TU_AO, state='progress'),

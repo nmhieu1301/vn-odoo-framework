@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
 """Manufacturing DTOs.
 
-What this deliberately does **not** carry is a labour or overhead figure.
-Odoo 20 Community posts neither to the ledger: a workcenter's ``costs_hour``
-produces a statistical number that never reaches account 622 or 627, and there
-is no work-in-progress account. Putting such a figure beside a material cost
-that *is* journalised would produce a cost sheet where one column reconciles to
-the accounts and the next does not, without saying which is which.
-
-So this reports what the ledger actually capitalised, and says plainly that it
-is direct materials only.
+What this does **not** carry is a separate labour or overhead figure. Odoo 20
+adds a workcenter's cost and the order's extra unit cost to the finished
+goods, so they are inside ``output_value`` and show as the variance against
+the material cost; breaking them out is not done yet.
 """
 
 from datetime import date
@@ -33,7 +28,7 @@ class ProductionDTO(NamedTuple):
 
 
 class ProductionCostDTO(NamedTuple):
-    """One manufacturing order, costed from its valuation layers."""
+    """One manufacturing order, costed from its stock moves' values."""
 
     production: ProductionDTO
     material_cost: float = 0.0

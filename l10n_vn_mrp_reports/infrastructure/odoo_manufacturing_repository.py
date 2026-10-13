@@ -2,16 +2,19 @@
 # Target: Odoo 20.0 Community Edition
 """Odoo implementation of ``IManufacturingRepository``.
 
-Cost and quantity both come from ``stock.valuation.layer``, joined to the moves
-that a manufacturing order owns:
+Cost and quantity both come from the stock moves a manufacturing order owns.
+Odoo 20 has no ``stock.valuation.layer``; the value a move took into or out of
+stock is ``stock_move.value``, signed the way the layer used to be:
 
-* components carry ``stock_move.raw_material_production_id``, and their layers
-  are negative because the value left stock — so the material cost is the
-  negated sum;
-* the finished goods carry ``stock_move.production_id``, and their layer is
-  the value Odoo capitalised into account 155.
+* components carry ``stock_move.raw_material_production_id``; their value is
+  negative because it left stock, so the material cost is the negated sum;
+* the finished goods carry ``stock_move.production_id``; their value is what
+  Odoo capitalised into account 155.
 
-Taking the output quantity from the same layer as the output value, rather than
+Only done moves that actually crossed into or out of valued stock count
+(``is_in`` / ``is_out``), which is what Odoo itself values.
+
+Taking the output quantity from the same moves as the output value, rather than
 from ``qty_produced`` on the order, keeps the two consistent: a unit cost
 computed from a quantity and a value that came from different places is a unit
 cost that can disagree with both.
@@ -104,7 +107,7 @@ class OdooManufacturingRepository(IManufacturingRepository, BaseRepository):
                     id=production.product_id.id,
                     code=production.product_id.default_code or '',
                     name=production.product_id.name or '',
-                    uom_name=production.product_uom_id.name or '',
+                    uom_name=production.uom_id.name or '',
                     category_name=production.product_id.categ_id.complete_name or '',
                 ),
                 state=production.state,
@@ -121,26 +124,26 @@ class OdooManufacturingRepository(IManufacturingRepository, BaseRepository):
         if not production_ids:
             return {}
         self._flush()
-        # The consumption date follows the same rule as the inventory reports:
-        # the stock move carries the effective date, and a layer without one
-        # (revaluations) falls back to when it was written.
+        # The consumption date is the date the component move was done, as in
+        # the inventory reports.
         bounds, params = '', [tuple(production_ids)]
         if date_from:
-            bounds += " AND COALESCE(sm.date, svl.create_date) >= %s"
+            bounds += " AND sm.date >= %s"
             params.append(odoo_fields.Date.to_string(date_from))
         if date_to:
-            bounds += " AND COALESCE(sm.date, svl.create_date) <= %s"
+            bounds += " AND sm.date <= %s"
             params.append('%s 23:59:59' % odoo_fields.Date.to_string(date_to))
         self.cr.execute("""
             SELECT sm.raw_material_production_id  AS production_id,
-                   COALESCE(SUM(svl.value), 0.0)  AS value
-              FROM stock_valuation_layer svl
-              JOIN stock_move sm ON sm.id = svl.stock_move_id
-             WHERE sm.raw_material_production_id IN %%s%s
+                   COALESCE(SUM(sm.value), 0.0)   AS value
+              FROM stock_move sm
+             WHERE sm.raw_material_production_id IN %%s
+               AND sm.state = 'done' AND (sm.is_in OR sm.is_out)%s
           GROUP BY sm.raw_material_production_id
         """ % bounds, params)
-        # Components leave stock, so their layers are negative. The cost of the
-        # order is what left.
+        # Components leave stock, so their value is negative. The cost of the
+        # order is what left; a component returned to stock comes back
+        # positive and reduces it.
         return {row['production_id']: -(row['value'] or 0.0)
                 for row in self.cr.dictfetchall()}
 
@@ -150,11 +153,16 @@ class OdooManufacturingRepository(IManufacturingRepository, BaseRepository):
         self._flush()
         self.cr.execute("""
             SELECT sm.production_id                   AS production_id,
-                   COALESCE(SUM(svl.quantity), 0.0)   AS quantity,
-                   COALESCE(SUM(svl.value), 0.0)      AS value
-              FROM stock_valuation_layer svl
-              JOIN stock_move sm ON sm.id = svl.stock_move_id
+                   COALESCE(SUM(
+                       (SELECT COALESCE(SUM(sml.quantity_product_uom), 0.0)
+                          FROM stock_move_line sml
+                         WHERE sml.move_id = sm.id AND sml.picked)
+                       * CASE WHEN sm.is_out THEN -1 ELSE 1 END), 0.0)
+                                                      AS quantity,
+                   COALESCE(SUM(sm.value), 0.0)       AS value
+              FROM stock_move sm
              WHERE sm.production_id IN %s
+               AND sm.state = 'done' AND (sm.is_in OR sm.is_out)
           GROUP BY sm.production_id
         """, (tuple(production_ids),))
         return {row['production_id']: (row['quantity'] or 0.0,
@@ -162,5 +170,5 @@ class OdooManufacturingRepository(IManufacturingRepository, BaseRepository):
                 for row in self.cr.dictfetchall()}
 
     def _flush(self):
-        self.env['stock.valuation.layer'].flush_model()
         self.env['stock.move'].flush_model()
+        self.env['stock.move.line'].flush_model()

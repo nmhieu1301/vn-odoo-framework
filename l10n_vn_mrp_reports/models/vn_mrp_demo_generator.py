@@ -53,6 +53,12 @@ class VnMrpDemoGenerator(models.AbstractModel):
             'categ_id': tp_categ.id,
         })
 
+        # Consumption and output post through the production location's
+        # valuation account. 154: issue Nợ 154 / Có 152, receipt Nợ 155 / Có 154.
+        production = finished.with_company(company).property_stock_production
+        if production and not production.valuation_account_id:
+            production.valuation_account_id = self._account(company, 'input_tp')
+
         self._set_stock(company, component, 500.0)
         bom = self.env['mrp.bom'].create({
             'product_tmpl_id': finished.product_tmpl_id.id,
@@ -120,6 +126,13 @@ class VnMrpDemoGenerator(models.AbstractModel):
         """
         location = self.env['stock.warehouse'].search(
             [('company_id', '=', company.id)], limit=1).lot_stock_id
+        # Odoo 20 posts a stock entry only when the location on the other
+        # side carries a valuation account. Opening stock comes in from the
+        # inventory adjustment location; give it 331, the counterpart the
+        # earlier versions' demo printed on S10-DN.
+        adjustment = product.with_company(company).property_stock_inventory
+        if adjustment and not adjustment.valuation_account_id:
+            adjustment.valuation_account_id = self._account(company, 'input_nvl')
         quant = self.env['stock.quant'].with_context(
             inventory_mode=True).create({
                 'product_id': product.id,
@@ -129,21 +142,19 @@ class VnMrpDemoGenerator(models.AbstractModel):
         quant.action_apply_inventory()
 
     def _run_order(self, finished, bom, quantity, finish):
-        # Imported lazily: odoo.tests is a heavyweight import that production
-        # code should not pull at registry load; only this demo path needs the
-        # Form emulator to run the manufacturing onchanges.
-        from odoo.tests import Form
-        order_form = Form(self.env['mrp.production'])
-        order_form.product_id = finished
-        order_form.bom_id = bom
-        order_form.product_qty = quantity
-        order = order_form.save()
+        # The component moves are computed from the BoM on create, so no Form
+        # emulator is needed — and Odoo 20 logs an error whenever business
+        # code imports odoo.tests.
+        order = self.env['mrp.production'].create({
+            'product_id': finished.id,
+            'bom_id': bom.id,
+            'product_qty': quantity,
+        })
         order.action_confirm()
         order.action_assign()
         if finish:
-            order_form = Form(order)
-            order_form.qty_producing = quantity
-            order = order_form.save()
+            order.qty_producing = quantity
+            order._set_qty_producing(False)
             order.button_mark_done()
         else:
             # Issue the components without finishing: the raw moves complete,
