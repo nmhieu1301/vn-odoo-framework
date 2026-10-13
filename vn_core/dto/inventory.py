@@ -29,8 +29,8 @@ class ProductDTO(NamedTuple):
 class InventoryMoveDTO(NamedTuple):
     """One valued movement: a quantity and the value that moved with it.
 
-    On 20.0 a stock move, or a standard-cost change carried as a value-only
-    line (``move_id`` None, quantity 0).
+    On 20.0 a stock move, or a cost change carried as a value-only line
+    (``move_id`` None, quantity 0).
     """
 
     id: int
@@ -50,7 +50,11 @@ class InventoryMoveDTO(NamedTuple):
 
     @property
     def is_incoming(self):
-        return self.quantity > 0
+        # A revaluation moves no quantity; it is incoming when it adds value,
+        # otherwise a cost increase would be printed and totalled as an issue.
+        if self.quantity:
+            return self.quantity > 0
+        return self.value >= 0
 
 
 class InventoryBalanceDTO(NamedTuple):
