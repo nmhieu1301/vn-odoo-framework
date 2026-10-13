@@ -46,6 +46,17 @@ class IManufacturingRepository(abc.ABC):
     def get_outputs(self, production_ids):
         """-> ``{production_id: (quantity, value)}`` of the finished goods."""
 
+    def get_conversion_costs(self, production_ids):
+        """-> ``{production_id: (labour, overhead)}`` of finished orders.
+
+        Labour is the workcenter cost of the order's operations, overhead the
+        extra unit cost times the quantity produced: the two amounts Odoo adds
+        to the materials when it values the finished goods. Not abstract: a
+        repository on a version that charges neither returns nothing, and the
+        cost sheet is materials only.
+        """
+        return {}
+
     @abc.abstractmethod
     def get_currency(self, company_ids):
         """-> CurrencyDTO of the reporting company."""

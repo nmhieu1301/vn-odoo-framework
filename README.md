@@ -95,10 +95,12 @@ ledger for exactly the accounts behind that figure.
 * B01-DN: 12 rarely used lines have no account expression yet. They are left
   blank rather than guessed. The report lists every account with a balance that
   no line picks up.
-* Production cost breaks out direct materials only. Odoo 19 adds workcenter
-  costs and the order's extra unit cost to the finished goods; the report shows
-  them as the difference between finished value and material cost rather than
-  as separate labour (622) and overhead (627) columns.
+* Production cost splits materials (621), labour (622, the operations'
+  workcenter cost) and overhead (627, the order's extra unit cost). Labour and
+  overhead are charged when an order finishes, so work in progress is
+  materials only. Odoo posts the labour to 154 but posts nothing for the extra
+  unit cost, so the 154 balance is lower than the work in progress by the
+  overhead already capitalised.
 * S21-DN prints the "country / year of manufacture" column blank because the
   asset subledger does not store those fields.
 

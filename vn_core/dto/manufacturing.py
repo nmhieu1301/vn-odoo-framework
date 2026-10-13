@@ -1,10 +1,20 @@
 # -*- coding: utf-8 -*-
 """Manufacturing DTOs.
 
-What this does **not** carry is a separate labour or overhead figure. Odoo 19
-adds a workcenter's cost and the order's extra unit cost to the finished
-goods, so they are inside ``output_value`` and show as the variance against
-the material cost; breaking them out is not done yet.
+A production cost is split the way VAS splits it, into three elements:
+
+* direct materials (621) — the value of the components issued, from the
+  stock moves;
+* direct labour (622) — the workcenter cost of the order's operations, what
+  ``mrp.workorder._cal_cost`` charges and Odoo posts to the work-in-progress
+  account when the order finishes;
+* production overhead (627) — the order's extra unit cost times the quantity
+  produced.
+
+Odoo adds all three to the value of the finished goods, so under average or
+FIFO costing the output value is their sum and the variance is zero. A
+repository that cannot supply labour and overhead leaves them at zero, and
+the cost sheet is then materials only.
 """
 
 from datetime import date
@@ -28,23 +38,29 @@ class ProductionDTO(NamedTuple):
 
 
 class ProductionCostDTO(NamedTuple):
-    """One manufacturing order, costed from its stock moves' values."""
+    """One manufacturing order, costed element by element."""
 
     production: ProductionDTO
     material_cost: float = 0.0
     output_quantity: float = 0.0
     output_value: float = 0.0
+    labour_cost: float = 0.0
+    overhead_cost: float = 0.0
+
+    @property
+    def total_cost(self):
+        return self.material_cost + self.labour_cost + self.overhead_cost
 
     @property
     def variance(self):
         """What the finished goods were valued at, less what went in.
 
         Zero under moving average or FIFO, because Odoo values the output at
-        exactly the sum of the inputs. Non-zero under standard costing, where
-        the difference is the price variance — and non-zero whenever a landed
-        cost was added after the fact.
+        exactly the sum of the three elements. Non-zero under standard costing,
+        where the difference is the price variance — and non-zero whenever a
+        landed cost was added after the fact.
         """
-        return self.output_value - self.material_cost
+        return self.output_value - self.total_cost
 
     @property
     def unit_cost(self):
@@ -61,6 +77,12 @@ class ProductCostSummaryDTO(NamedTuple):
     material_cost: float = 0.0
     output_quantity: float = 0.0
     output_value: float = 0.0
+    labour_cost: float = 0.0
+    overhead_cost: float = 0.0
+
+    @property
+    def total_cost(self):
+        return self.material_cost + self.labour_cost + self.overhead_cost
 
     @property
     def unit_cost(self):
@@ -78,6 +100,9 @@ class CostCardRowDTO(NamedTuple):
     Standard costing breaks it by the price variance, so the difference is
     exposed rather than forced to zero: a card that always balances teaches
     nobody anything.
+
+    Work in progress is materials only: Odoo charges labour and overhead to an
+    order when it finishes, so an open order carries none yet.
     """
 
     product: ProductDTO
@@ -92,6 +117,14 @@ class CostCardRowDTO(NamedTuple):
     closing_wip: float = 0.0
     finished_order_count: int = 0
     open_order_count: int = 0
+    #: Labour and overhead of the orders finished within the period.
+    period_labour: float = 0.0
+    period_overhead: float = 0.0
+
+    @property
+    def period_total(self):
+        """All three elements incurred in the period."""
+        return self.period_cost + self.period_labour + self.period_overhead
 
     @property
     def unit_cost(self):
@@ -102,7 +135,7 @@ class CostCardRowDTO(NamedTuple):
     @property
     def imbalance(self):
         """Opening + costs − finished − closing. Zero when the card balances."""
-        return (self.opening_wip + self.period_cost
+        return (self.opening_wip + self.period_total
                 - self.finished_value - self.closing_wip)
 
 
@@ -115,10 +148,17 @@ class CostCardDTO(NamedTuple):
     currency: CurrencyDTO
     date_from: Optional[date] = None
     date_to: Optional[date] = None
+    total_period_labour: float = 0.0
+    total_period_overhead: float = 0.0
+
+    @property
+    def total_period_total(self):
+        return (self.total_period_cost + self.total_period_labour
+                + self.total_period_overhead)
 
     @property
     def imbalance(self):
-        return (self.total_opening_wip + self.total_period_cost
+        return (self.total_opening_wip + self.total_period_total
                 - self.total_finished_value - self.total_closing_wip)
 
 
@@ -133,3 +173,9 @@ class ManufacturingCostDTO(NamedTuple):
     currency: CurrencyDTO
     date_from: Optional[date] = None
     date_to: Optional[date] = None
+    labour_cost: float = 0.0
+    overhead_cost: float = 0.0
+
+    @property
+    def total_cost(self):
+        return self.material_cost + self.labour_cost + self.overhead_cost

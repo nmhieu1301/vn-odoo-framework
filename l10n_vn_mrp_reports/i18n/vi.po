@@ -62,8 +62,8 @@ msgstr "Mức chi tiết"
 
 #. module: l10n_vn_mrp_reports
 #: model_terms:ir.ui.view,arch_db:l10n_vn_mrp_reports.view_vn_production_cost_wizard_form
-msgid "Direct materials only, taken from the value of the components issued to each order. Odoo 19 also adds workcenter costs and the order's extra unit cost to the finished goods, so those show as the difference between the finished value and the material cost."
-msgstr "Chỉ gồm chi phí nguyên vật liệu trực tiếp, lấy từ giá trị vật tư đã xuất cho từng lệnh sản xuất. Odoo 19 còn cộng chi phí công đoạn và chi phí phụ trên mỗi đơn vị của lệnh vào giá trị thành phẩm, nên các khoản đó hiện ra ở phần chênh lệch giữa giá trị nhập kho và chi phí nguyên vật liệu."
+msgid "Split into direct materials (the components issued), direct labour (the operations' workcenter cost) and production overhead (the order's extra unit cost): the three amounts Odoo adds up to value the finished goods. Labour and overhead are charged when an order finishes, so work in progress is materials only."
+msgstr "Tách thành nguyên vật liệu trực tiếp (vật tư đã xuất), nhân công trực tiếp (chi phí công đoạn) và sản xuất chung (chi phí phụ trên mỗi đơn vị của lệnh): ba khoản Odoo cộng lại để định giá thành phẩm. Nhân công và sản xuất chung được tính khi lệnh hoàn thành, nên dở dang chỉ gồm nguyên vật liệu."
 
 #. module: l10n_vn_mrp_reports
 #: model_terms:ir.ui.view,arch_db:l10n_vn_mrp_reports.view_vn_production_cost_wizard_form

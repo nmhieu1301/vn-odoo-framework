@@ -29,7 +29,7 @@ def _mo(mo_id, product, state='done', finished=date(2026, 3, 15),
 class FakeManufacturingRepository(IManufacturingRepository):
 
     def __init__(self, done=(), open_orders=(), materials=None, outputs=None,
-                 consumptions=(), currency=VND):
+                 consumptions=(), currency=VND, conversion=None):
         self.done = tuple(done)
         self.open_orders = tuple(open_orders)
         self.materials = dict(materials or {})
@@ -40,6 +40,8 @@ class FakeManufacturingRepository(IManufacturingRepository):
         #: undated shortcut the older tests use.
         self.consumptions = tuple(consumptions)
         self.currency = currency
+        #: ``{production_id: (labour, overhead)}``; empty means materials only.
+        self.conversion = dict(conversion or {})
 
     def get_currency(self, company_ids):
         return self.currency
@@ -72,6 +74,9 @@ class FakeManufacturingRepository(IManufacturingRepository):
 
     def get_outputs(self, production_ids):
         return {k: v for k, v in self.outputs.items() if k in production_ids}
+
+    def get_conversion_costs(self, production_ids):
+        return {k: v for k, v in self.conversion.items() if k in production_ids}
 
 
 class ManufacturingCase(unittest.TestCase):
@@ -292,6 +297,103 @@ class TestCostCard(ManufacturingCase):
         self.assertEqual(self._row(report, BAN_AN.id).opening_wip, 0.0)
         # February consumption then belongs to the period itself.
         self.assertEqual(self._row(report, BAN_AN.id).period_cost, 38000000.0)
+
+
+class TestConversionCosts(ManufacturingCase):
+    """Labour (622) and overhead (627) beside the materials (621).
+
+    Order 1: 30,000,000 of materials, 4,000,000 of workcenter time and
+    500,000 a unit of extra cost on 10 units; Odoo values the output at the sum.
+    Order 2 is the same product with no operations: materials only.
+    """
+
+    done = (_mo(1, BAN_AN), _mo(2, BAN_AN, finished=date(2026, 4, 2)))
+    materials = {1: 30000000.0, 2: 12000000.0}
+    outputs = {1: (10.0, 39000000.0), 2: (4.0, 12000000.0)}
+    conversion = {1: (4000000.0, 5000000.0)}
+
+    def setUp(self):
+        self.repo = FakeManufacturingRepository(
+            self.done, materials=self.materials, outputs=self.outputs,
+            conversion=self.conversion)
+        self.engine = ManufacturingCostEngine(self.repo)
+
+    def test_each_element_is_reported(self):
+        order = self._order(self.engine.compute(self._filter()), 1)
+        self.assertEqual((order.material_cost, order.labour_cost,
+                          order.overhead_cost),
+                         (30000000.0, 4000000.0, 5000000.0))
+        self.assertEqual(order.total_cost, 39000000.0)
+
+    def test_no_variance_when_the_output_is_the_sum_of_the_elements(self):
+        report = self.engine.compute(self._filter())
+        self.assertEqual(self._order(report, 1).variance, 0.0)
+        self.assertEqual(self._order(report, 2).variance, 0.0)
+
+    def test_product_summary_pools_the_elements(self):
+        summary = self._product(self.engine.compute(self._filter()), BAN_AN.id)
+        self.assertEqual(summary.labour_cost, 4000000.0)
+        self.assertEqual(summary.overhead_cost, 5000000.0)
+        self.assertEqual(summary.total_cost, 51000000.0)
+        self.assertEqual(summary.output_value, 51000000.0)
+
+    def test_report_totals_carry_the_elements(self):
+        report = self.engine.compute(self._filter())
+        self.assertEqual((report.material_cost, report.labour_cost,
+                          report.overhead_cost, report.total_cost),
+                         (42000000.0, 4000000.0, 5000000.0, 51000000.0))
+
+    def test_without_conversion_costs_the_sheet_is_materials_only(self):
+        """A repository that supplies none — every version before 19."""
+        self.repo.conversion = {}
+        order = self._order(self.engine.compute(self._filter()), 1)
+        self.assertEqual((order.labour_cost, order.overhead_cost), (0.0, 0.0))
+        self.assertEqual(order.variance, 9000000.0)
+
+
+class TestCostCardConversionCosts(ManufacturingCase):
+    """S37-DN with labour and overhead.
+
+    March 2026. Order 1 finished on 15 March: 20,000,000 of materials,
+    3,000,000 of labour, 1,000,000 of overhead, output 24,000,000. Order 2 is
+    still open with 8,000,000 of materials issued: labour on it has not been
+    charged yet, so the closing WIP is its materials alone.
+    """
+
+    done = (_mo(1, BAN_AN, finished=date(2026, 3, 15), started=date(2026, 3, 2)),)
+    open_orders = (_mo(2, BAN_AN, state='progress', started=date(2026, 3, 20)),)
+
+    def setUp(self):
+        self.repo = FakeManufacturingRepository(
+            self.done, self.open_orders,
+            consumptions=((1, date(2026, 3, 5), 20000000.0),
+                          (2, date(2026, 3, 25), 8000000.0)),
+            outputs={1: (10.0, 24000000.0)},
+            conversion={1: (3000000.0, 1000000.0), 2: (999.0, 999.0)})
+        self.engine = ManufacturingCostEngine(self.repo)
+        self.report = self.engine.compute_cost_card(ManufacturingFilter(
+            date_from=date(2026, 3, 1), date_to=date(2026, 3, 31),
+            company_ids=(1,)))
+        self.row = self.report.rows[0]
+
+    def test_costs_incurred_are_split_by_element(self):
+        self.assertEqual((self.row.period_cost, self.row.period_labour,
+                          self.row.period_overhead),
+                         (28000000.0, 3000000.0, 1000000.0))
+        self.assertEqual(self.row.period_total, 32000000.0)
+
+    def test_open_orders_carry_no_labour_into_wip(self):
+        self.assertEqual(self.row.closing_wip, 8000000.0)
+
+    def test_the_card_balances_with_all_three_elements(self):
+        self.assertEqual(self.row.imbalance, 0.0)
+        self.assertEqual(self.report.imbalance, 0.0)
+
+    def test_totals_cross_foot(self):
+        self.assertEqual((self.report.total_period_labour,
+                          self.report.total_period_overhead,
+                          self.report.total_period_total),
+                         (3000000.0, 1000000.0, 32000000.0))
 
 
 class TestEmptyAndValidation(ManufacturingCase):

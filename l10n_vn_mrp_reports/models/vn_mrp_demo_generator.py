@@ -22,7 +22,15 @@ _ACCOUNT_FALLBACKS = {
     'output_nvl': ('621', '154'),
     'input_tp': ('154',),
     'output_tp': ('632',),
+    'labour': ('622', '6271', '642'),
 }
+
+#: The demo's assembly team: what an hour costs, and the time one wardrobe
+#: takes. Costed on the planned time so the demo needs no clocked hours.
+LABOUR_COST_HOUR = 120000.0
+MINUTES_PER_UNIT = 30.0
+#: Overhead charged per wardrobe (electricity, glue, depreciation share).
+EXTRA_UNIT_COST = 50000.0
 
 
 class VnMrpDemoGenerator(models.AbstractModel):
@@ -60,11 +68,27 @@ class VnMrpDemoGenerator(models.AbstractModel):
             production.valuation_account_id = self._account(company, 'input_tp')
 
         self._set_stock(company, component, 500.0)
+        # One operation, so the orders carry labour: Odoo values the output at
+        # materials + workcenter cost + extra unit cost and posts the labour
+        # Nợ 154 / Có 622 when the order finishes.
+        workcenter = self.env['mrp.workcenter'].create({
+            'name': 'Tổ lắp ráp (demo SX)',
+            'company_id': company.id,
+            'costs_hour': LABOUR_COST_HOUR,
+            'expense_account_id': self._account(company, 'labour').id,
+        })
         bom = self.env['mrp.bom'].create({
             'product_tmpl_id': finished.product_tmpl_id.id,
             'product_qty': 1,
             'bom_line_ids': [(0, 0, {'product_id': component.id,
                                      'product_qty': 4})],
+            'operation_ids': [(0, 0, {
+                'name': 'Lắp ráp',
+                'workcenter_id': workcenter.id,
+                'time_mode': 'manual',
+                'time_cycle_manual': MINUTES_PER_UNIT,
+                'cost_mode': 'estimated',
+            })],
         })
 
         for quantity in (10.0, 5.0):
@@ -150,6 +174,9 @@ class VnMrpDemoGenerator(models.AbstractModel):
             'bom_id': bom.id,
             'product_qty': quantity,
         })
+        # Set on the order rather than the BoM: the BoM field is 19.0 only,
+        # the order's has been there since 17.0.
+        order.extra_cost = EXTRA_UNIT_COST
         order.action_confirm()
         order.action_assign()
         if finish:

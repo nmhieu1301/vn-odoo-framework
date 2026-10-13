@@ -421,19 +421,28 @@ def cost_card(report, doc, filter_summary):
     columns = [
         ('Mã SP', 14, TEXT), ('Tên sản phẩm, dịch vụ', 40, TEXT),
         ('ĐVT', 10, TEXT),
-        ('Dở dang đầu kỳ', 18, MONEY), ('Phát sinh trong kỳ', 18, MONEY),
+        ('Dở dang đầu kỳ', 18, MONEY),
+        ('Phát sinh - NVL trực tiếp', 18, MONEY),
+        ('Phát sinh - Nhân công trực tiếp', 18, MONEY),
+        ('Phát sinh - Sản xuất chung', 18, MONEY),
+        ('Phát sinh - Cộng', 18, MONEY),
         ('Giá thành trong kỳ', 18, MONEY), ('Dở dang cuối kỳ', 18, MONEY),
         ('SL hoàn thành', 14, NUMBER), ('Giá thành đơn vị', 18, MONEY),
         ('Chênh lệch', 16, MONEY),
     ]
     rows = [('', [row.product.code, row.product.name, row.product.uom_name,
                   row.opening_wip or None, row.period_cost or None,
+                  row.period_labour or None, row.period_overhead or None,
+                  row.period_total or None,
                   row.finished_value or None, row.closing_wip or None,
                   row.finished_quantity or None, row.unit_cost or None,
                   row.imbalance or None])
             for row in report.rows]
     rows.append(('total', [None, 'Tổng cộng', None,
                            report.total_opening_wip, report.total_period_cost,
+                           report.total_period_labour,
+                           report.total_period_overhead,
+                           report.total_period_total,
                            report.total_finished_value,
                            report.total_closing_wip,
                            None, None, report.imbalance or None]))
@@ -455,16 +464,22 @@ def production_cost(report, doc, filter_summary):
         'heading': _heading(report, doc, filter_summary),
         'columns': [('Mã sản phẩm', 14, TEXT), ('Tên sản phẩm', 40, TEXT),
                     ('ĐVT', 10, TEXT), ('Số lệnh', 10, NUMBER),
-                    ('Số lượng', 14, NUMBER), ('Chi phí NVL', 18, MONEY),
+                    ('Số lượng', 14, NUMBER), ('NVL trực tiếp', 18, MONEY),
+                    ('Nhân công trực tiếp', 18, MONEY),
+                    ('Sản xuất chung', 18, MONEY),
+                    ('Cộng chi phí', 18, MONEY),
                     ('Giá trị nhập kho', 18, MONEY),
                     ('Giá thành đơn vị', 18, MONEY)],
         'rows': [('', [row.product.code, row.product.name,
                        row.product.uom_name, row.order_count,
                        row.output_quantity, row.material_cost,
-                       row.output_value, row.unit_cost])
+                       row.labour_cost or None, row.overhead_cost or None,
+                       row.total_cost, row.output_value, row.unit_cost])
                  for row in report.products]
         + [('total', [None, 'Tổng cộng', None, None, None,
-                      report.material_cost, report.output_value, None])],
+                      report.material_cost, report.labour_cost,
+                      report.overhead_cost, report.total_cost,
+                      report.output_value, None])],
     }
     order_sheet = {
         'name': 'Chi tiet theo lenh',
@@ -472,13 +487,16 @@ def production_cost(report, doc, filter_summary):
         'heading': [],
         'columns': [('Lệnh sản xuất', 20, TEXT), ('Ngày hoàn thành', 14, DATE),
                     ('Sản phẩm', 40, TEXT), ('Số lượng', 14, NUMBER),
-                    ('Chi phí NVL', 18, MONEY),
+                    ('NVL trực tiếp', 18, MONEY),
+                    ('Nhân công trực tiếp', 18, MONEY),
+                    ('Sản xuất chung', 18, MONEY),
                     ('Giá trị nhập kho', 18, MONEY),
                     ('Chênh lệch', 16, MONEY),
                     ('Giá thành đơn vị', 18, MONEY)],
         'rows': [('', [row.production.name, row.production.date_finished,
                        row.production.product.display_name,
                        row.output_quantity, row.material_cost,
+                       row.labour_cost or None, row.overhead_cost or None,
                        row.output_value, row.variance or None, row.unit_cost])
                  for row in report.orders],
     }
