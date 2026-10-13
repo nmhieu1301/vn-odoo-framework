@@ -3,7 +3,7 @@
 """Demo stock movements for the inventory reports.
 
 The accounting demo (``vn.demo.data.generator``) writes journal entries; this
-writes what the stock reports actually read — valuation layers — through the
+writes what the stock reports actually read — valued stock moves — through the
 regular inventory-adjustment flow, with **real-time valuation** wired to the
 Vietnamese accounts so S10-DN has a "TK đối ứng" column worth printing and
 07-VT has issues to allocate.
@@ -93,16 +93,14 @@ class VnStockDemoGenerator(models.AbstractModel):
         Category = self.env['product.category']
 
         def category(name, valuation_key, input_key, output_key):
+            # Odoo 19 dropped the interim input/output accounts on the
+            # category; only the valuation account and journal remain.
             return Category.create({
                 'name': name,
                 'property_valuation': 'real_time',
                 'property_cost_method': 'average',
                 'property_stock_valuation_account_id':
                     self._account(company, valuation_key).id,
-                'property_stock_account_input_categ_id':
-                    self._account(company, input_key).id,
-                'property_stock_account_output_categ_id':
-                    self._account(company, output_key).id,
                 'property_stock_journal': journal.id,
             })
 
@@ -121,6 +119,13 @@ class VnStockDemoGenerator(models.AbstractModel):
         """
         location = self.env['stock.warehouse'].search(
             [('company_id', '=', company.id)], limit=1).lot_stock_id
+        # Odoo 19 posts a stock entry only when the location on the other
+        # side carries a valuation account. Opening stock comes in from the
+        # inventory adjustment location; give it 331, the counterpart the
+        # earlier versions' demo printed on S10-DN.
+        adjustment = product.with_company(company).property_stock_inventory
+        if adjustment and not adjustment.valuation_account_id:
+            adjustment.valuation_account_id = self._account(company, 'input_nvl')
         quant = self.env['stock.quant'].with_context(
             inventory_mode=True).create({
                 'product_id': product.id,
