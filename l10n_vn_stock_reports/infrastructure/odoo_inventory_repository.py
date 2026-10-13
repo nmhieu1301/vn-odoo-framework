@@ -181,5 +181,8 @@ class OdooInventoryRepository(IInventoryRepository, BaseRepository):
         # _where_calc + _apply_ir_rules and applies the rules itself.
         query = model._search(self._build_domain(inventory_filter))
         from_sql, where_sql = query.from_clause, query.where_clause
-        return (from_sql.code, where_sql.code,
-                list(from_sql.params) + list(where_sql.params))
+        # 20.0 dropped SQL.code and SQL.params; _sql_tuple is what
+        # odoo/tools/sql.py documents as (code, params, to_flush).
+        from_code, from_params, _ = from_sql._sql_tuple
+        where_code, where_params, _ = where_sql._sql_tuple
+        return (from_code, where_code, list(from_params) + list(where_params))
