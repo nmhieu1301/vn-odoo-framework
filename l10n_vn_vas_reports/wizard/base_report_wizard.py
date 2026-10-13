@@ -168,7 +168,9 @@ class VnReportWizardMixin(models.AbstractModel):
         writer = VnXlsxWriter(
             decimal_places=self.company_id.currency_id.decimal_places)
         self.write({
-            'xlsx_file': base64.b64encode(writer.build(sheets)),
+            # A base64 *string*: Odoo 20's Binary field refuses bytes, and
+            # every version accepts the string form.
+            'xlsx_file': base64.b64encode(writer.build(sheets)).decode(),
             'xlsx_filename': '%s-%s.xlsx' % (
                 self._sheet_name().replace(' ', '-'), self.date_to),
         })
