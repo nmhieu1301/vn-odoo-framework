@@ -23,13 +23,13 @@ class AccountMoveLine(models.Model):
         if parent_init:
             parent_init()
         create_index(
-            self._cr,
+            self.env.cr,
             'account_move_line_vn_ledger_idx',
             self._table,
             ['company_id', 'parent_state', 'date', 'account_id'],
         )
         create_index(
-            self._cr,
+            self.env.cr,
             'account_move_line_vn_partner_idx',
             self._table,
             ['company_id', 'parent_state', 'date', 'partner_id'],
