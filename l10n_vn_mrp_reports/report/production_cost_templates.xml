@@ -6,23 +6,22 @@
         Hai bố cục trên cùng một DTO: tổng hợp theo sản phẩm (cách VAS trình bày
         giá thành) và chi tiết theo từng lệnh sản xuất.
 
-        Ghi chú ở cuối không phải để trang trí. Báo cáo này **không có** chi phí
-        nhân công trực tiếp và sản xuất chung, vì Odoo 19 CE không hạch toán
-        chúng vào sổ. In một con số thống kê cạnh một con số đã vào sổ mà không
-        nói rõ cái nào là cái nào thì tệ hơn là không in.
+        Ghi chú ở cuối không phải để trang trí. Báo cáo này chỉ tách riêng chi
+        phí nguyên vật liệu trực tiếp. Odoo 19 có cộng chi phí công đoạn và chi
+        phí phụ của lệnh vào giá trị thành phẩm, nhưng báo cáo chưa tách chúng
+        thành cột riêng, nên phải nói rõ chúng nằm ở đâu.
     -->
     <template id="production_cost_note">
         <div class="o_vn_note o_vn_scope_note">
             <strong>Phạm vi báo cáo:</strong>
-            chỉ gồm <strong>chi phí nguyên vật liệu trực tiếp</strong>, lấy từ
-            valuation layer của vật tư đã xuất cho lệnh sản xuất, nên khớp với
-            các TK 152 và 155.
-            Chi phí nhân công trực tiếp (622) và chi phí sản xuất chung (627)
-            <strong>không có trong báo cáo này</strong>: báo cáo đo giá trị vật
-            tư trên valuation layer. Odoo 18 hạch toán tiêu hao sản xuất qua tài
-            khoản chi phí sản xuất của nhóm sản phẩm (nên trỏ về TK 154) — các
-            bút toán đó nằm trên Sổ chi phí SXKD (S36-DN), còn thẻ này vẫn chỉ
-            nói về nguyên vật liệu trực tiếp.
+            chỉ tách riêng <strong>chi phí nguyên vật liệu trực tiếp</strong>,
+            lấy từ giá trị vật tư đã xuất cho lệnh sản xuất.
+            Odoo 19 cộng thêm chi phí công đoạn (workcenter) và chi phí phụ trên
+            mỗi đơn vị của lệnh vào giá trị thành phẩm, và hạch toán nhân công
+            vào TK sản phẩm dở dang (154) khi địa điểm sản xuất có tài khoản
+            này. Hai khoản đó (622, 627) <strong>chưa được tách thành cột
+            riêng</strong>: chúng nằm trong giá trị nhập kho, nên hiện ra ở phần
+            chênh lệch giữa giá trị nhập kho và chi phí nguyên vật liệu.
         </div>
     </template>
 
@@ -32,9 +31,10 @@
             <span t-out="report.work_in_progress"
                   t-options="{'widget': 'monetary', 'display_currency': currency}"/>
             — vật tư đã xuất cho <t t-out="report.open_order_count"/> lệnh sản
-            xuất chưa hoàn thành tại ngày báo cáo. Odoo 19 Community không có tài
-            khoản sản phẩm dở dang, nên con số này không nằm ở đâu trong sổ; nó
-            được suy ra từ chính các lệnh đó để đối chiếu với số dư TK 154.
+            xuất chưa hoàn thành tại ngày báo cáo. Khi địa điểm sản xuất trỏ về
+            TK sản phẩm dở dang (154), Odoo 19 hạch toán vật tư xuất dùng vào tài
+            khoản đó, nên con số này đối chiếu được với phần nguyên vật liệu
+            trong số dư TK 154.
         </div>
     </template>
 
@@ -145,12 +145,13 @@
     <!-- ============ Thẻ tính giá thành sản phẩm, dịch vụ (S37-DN) ============ -->
     <!--
         Mẫu S37-DN chia mỗi chỉ tiêu theo ba khoản mục: NVL trực tiếp, nhân
-        công trực tiếp, sản xuất chung. Ở đây chỉ có cột NVL trực tiếp — hai
-        khoản mục kia Odoo 19 CE không hạch toán vào sổ (xem ghi chú phạm vi),
-        nên in số 0 cho chúng sẽ là khẳng định sai, còn in số thống kê sẽ là
-        trộn số ngoài sổ vào một tờ thẻ đối chiếu được với TK 154 và 155.
+        công trực tiếp, sản xuất chung. Ở đây chỉ có cột NVL trực tiếp — Odoo
+        20 cộng chi phí công đoạn và chi phí phụ vào giá trị thành phẩm nhưng
+        báo cáo chưa tách chúng (xem ghi chú phạm vi), nên in số 0 cho hai
+        khoản mục kia sẽ là khẳng định sai.
 
-        Bốn cột số được đo trực tiếp từ valuation layer, không suy ra lẫn nhau,
+        Bốn cột số được đo trực tiếp từ giá trị các lần nhập xuất, không suy ra
+        lẫn nhau,
         nên thẻ không tự cân: lệch = biến động giá thành định mức hoặc phát
         sinh ghi ngoài kỳ, và cột chênh lệch tồn tại để chỉ ra điều đó.
     -->

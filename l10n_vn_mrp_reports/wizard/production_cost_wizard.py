@@ -31,9 +31,9 @@ class VnProductionCostWizard(models.TransientModel):
     include_open = fields.Boolean(
         string='Show work in progress', default=True,
         help='Report the materials already issued to orders that had not '
-             'finished by the reporting date. Odoo 19 Community has no '
-             'work-in-progress account, so this figure exists nowhere in the '
-             'ledger and is derived from those orders.')
+             'finished by the reporting date. When the production location '
+             'carries the work-in-progress account (154), Odoo 19 posts them '
+             'there, so the figure can be checked against that balance.')
 
     # -- filter --------------------------------------------------------
     def _manufacturing_filter(self):

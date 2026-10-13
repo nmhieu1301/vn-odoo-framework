@@ -29,11 +29,11 @@
                 </group>
 
                 <div class="text-muted" colspan="2">
-                    Direct materials only, taken from the valuation layers of the
-                    components issued to each order, so the figures agree with
-                    accounts 152 and 155. Direct labour and production overhead
-                    are absent because Odoo 19 Community does not post them to
-                    the ledger.
+                    Direct materials only, taken from the value of the
+                    components issued to each order. Odoo 19 also adds
+                    workcenter costs and the order's extra unit cost to the
+                    finished goods, so those show as the difference between the
+                    finished value and the material cost.
                 </div>
 
                 <footer>

@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 """Manufacturing Cost Engine — Báo cáo chi phí sản xuất (Engine 5).
 
-Costs each manufacturing order from its valuation layers, rolls the result up
+Costs each manufacturing order from the value of its stock moves, rolls the
+result up
 per product, and reports separately what is still tied up in orders that have
 not finished.
 
-**What this engine does not do, and why.** It reports no direct labour and no
-production overhead. Odoo 19 Community journalises neither: a workcenter's
-``costs_hour`` yields a statistical figure that never reaches account 622 or
-627, and the Community edition has no work-in-progress account. A cost sheet
-mixing a journalised material cost with a statistical labour cost has one column
-that reconciles to the accounts and one that does not, and nothing on the page
-tells the reader which. Producing that quietly would be worse than producing
-less.
+**What this engine does not do.** It breaks out no direct labour and no
+production overhead. Odoo 19 adds a workcenter's cost and the order's extra
+unit cost to the value of the finished goods, and posts the labour to the
+work-in-progress account, but this engine still costs materials only: those
+amounts sit in the finished value and surface as the variance against the
+material cost rather than in columns of their own.
 
 Pure Python: no Odoo, no SQL.
 """
@@ -70,7 +69,7 @@ class ManufacturingCostEngine:
 
         Per product: chi phí dở dang đầu kỳ, phát sinh trong kỳ, giá thành
         nhập kho trong kỳ, dở dang cuối kỳ. Each figure is measured directly
-        from the valuation layers rather than derived from the other three, so
+        from the stock moves' values rather than derived from the other three, so
         a card that does not balance is *reporting* something — a standard-cost
         variance, or consumption recorded outside the period — instead of
         hiding it.
@@ -226,10 +225,10 @@ class ManufacturingCostEngine:
     def _work_in_progress(self, manufacturing_filter, rounding):
         """Materials issued to orders that had not finished by the date.
 
-        Odoo 19 Community has no work-in-progress account, so this figure exists
-        nowhere in the ledger. It is derived from the components already
-        consumed by orders still open, which is the same thing an accountant
-        computes by hand for the 154 balance.
+        Derived from the components already consumed by orders still open.
+        When the production location carries the work-in-progress account,
+        Odoo 19 posts that consumption to 154, so this is the material part of
+        that balance.
         """
         open_orders = self._repo.get_productions(manufacturing_filter,
                                                  done=False)

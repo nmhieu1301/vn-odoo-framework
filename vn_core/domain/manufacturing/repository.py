@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """Manufacturing repository interface.
 
-Cost and quantity both come from the valuation layers of the moves attached to a
-manufacturing order, for the same reason the inventory reports do: the layer is
-what Odoo posted to accounts 152 and 155, so a cost sheet built on it agrees
-with the ledger by construction. Reading quantities from the order and values
-from a price field would drift the moment a cost changed.
+Cost and quantity both come from the values Odoo put on the stock moves
+attached to a manufacturing order, for the same reason the inventory reports
+do. Reading quantities from the order and values from a price field would
+drift the moment a cost changed.
 """
 
 import abc
