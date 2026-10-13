@@ -3,7 +3,7 @@
 """Indexing support for ledger reporting.
 
 Every ledger query filters on ``company_id`` + ``parent_state`` + ``date`` and
-then groups by account or partner. Odoo 14 indexes some of those columns
+then groups by account or partner. Odoo 20 indexes some of those columns
 individually but not in combination, and a furniture SME's yearly General Ledger
 reaches several hundred thousand journal items.
 

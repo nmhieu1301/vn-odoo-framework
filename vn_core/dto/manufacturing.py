@@ -2,7 +2,7 @@
 """Manufacturing DTOs.
 
 What this deliberately does **not** carry is a labour or overhead figure.
-Odoo 14 Community posts neither to the ledger: a workcenter's ``costs_hour``
+Odoo 20 Community posts neither to the ledger: a workcenter's ``costs_hour``
 produces a statistical number that never reaches account 622 or 627, and there
 is no work-in-progress account. Putting such a figure beside a material cost
 that *is* journalised would produce a cost sheet where one column reconciles to
