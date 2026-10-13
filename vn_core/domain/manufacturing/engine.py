@@ -6,7 +6,7 @@ per product, and reports separately what is still tied up in orders that have
 not finished.
 
 **What this engine does not do, and why.** It reports no direct labour and no
-production overhead. Odoo 14 Community journalises neither: a workcenter's
+production overhead. Odoo 19 Community journalises neither: a workcenter's
 ``costs_hour`` yields a statistical figure that never reaches account 622 or
 627, and the Community edition has no work-in-progress account. A cost sheet
 mixing a journalised material cost with a statistical labour cost has one column
@@ -226,7 +226,7 @@ class ManufacturingCostEngine:
     def _work_in_progress(self, manufacturing_filter, rounding):
         """Materials issued to orders that had not finished by the date.
 
-        Odoo 14 Community has no work-in-progress account, so this figure exists
+        Odoo 19 Community has no work-in-progress account, so this figure exists
         nowhere in the ledger. It is derived from the components already
         consumed by orders still open, which is the same thing an accountant
         computes by hand for the 154 balance.

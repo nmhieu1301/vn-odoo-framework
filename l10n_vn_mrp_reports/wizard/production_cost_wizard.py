@@ -31,7 +31,7 @@ class VnProductionCostWizard(models.TransientModel):
     include_open = fields.Boolean(
         string='Show work in progress', default=True,
         help='Report the materials already issued to orders that had not '
-             'finished by the reporting date. Odoo 14 Community has no '
+             'finished by the reporting date. Odoo 19 Community has no '
              'work-in-progress account, so this figure exists nowhere in the '
              'ledger and is derived from those orders.')
 

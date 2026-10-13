@@ -32,7 +32,7 @@
                     Direct materials only, taken from the valuation layers of the
                     components issued to each order, so the figures agree with
                     accounts 152 and 155. Direct labour and production overhead
-                    are absent because Odoo 14 Community does not post them to
+                    are absent because Odoo 19 Community does not post them to
                     the ledger.
                 </div>
 

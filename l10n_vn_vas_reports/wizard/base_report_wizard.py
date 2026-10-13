@@ -269,7 +269,9 @@ class VnReportWizardMixin(models.AbstractModel):
                 return _('All')
             names = value.mapped('display_name')
             if len(names) > self._FILTER_NAME_LIMIT:
-                # Odoo 14's _() takes the source string only; interpolate after.
+                # Odoo 19's _() does accept interpolation arguments, but the
+                # .po files across this project were extracted with the source
+                # string alone. Interpolating after keeps one convention.
                 return _('%s and %s more') % (
                     ', '.join(names[:self._FILTER_NAME_LIMIT]),
                     len(names) - self._FILTER_NAME_LIMIT)
@@ -332,8 +334,8 @@ class VnReportWizardMixin(models.AbstractModel):
         values['interactive'] = True
         html = self.env['ir.ui.view']._render_template(
             self._screen_template(), values)
-        # _render_template returns bytes on some 14.0 builds and Markup on
-        # others; JSON-RPC can only carry text, so normalise here.
+        # _render_template returns Markup on 19.0, and bytes on some builds;
+        # JSON-RPC can only carry text, so normalise here.
         if isinstance(html, bytes):
             html = html.decode('utf-8')
         return str(html)

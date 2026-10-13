@@ -9,7 +9,7 @@ multiplying by a current cost would produce a report that looks right and
 disagrees with the ledger the moment a cost changes.
 
 **Which date a layer belongs to.** A valuation layer has no accounting date of
-its own in Odoo 14; it carries ``create_date``, which is when the record was
+its own in Odoo 19; it carries ``create_date``, which is when the record was
 written rather than when the movement happened. The effective date lives on the
 originating ``stock.move``, so that is used whenever there is one, falling back
 to ``create_date`` for layers with no move — inventory revaluations, mainly.
