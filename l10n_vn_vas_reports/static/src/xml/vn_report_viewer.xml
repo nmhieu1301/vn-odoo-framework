@@ -7,53 +7,53 @@
 
             <div class="o_vn_toolbar">
                 <div class="o_vn_toolbar_title">
-                    <span class="o_vn_report_name" t-out="reportName"/>
-                    <span class="o_vn_summary" t-out="state.summary"/>
+                    <span class="o_vn_report_name" t-out="this.reportName"/>
+                    <span class="o_vn_summary" t-out="this.state.summary"/>
                 </div>
 
-                <div class="o_vn_toolbar_actions" t-if="!state.failed">
+                <div class="o_vn_toolbar_actions" t-if="!this.state.failed">
                     <button type="button" class="btn btn-primary btn-sm o_vn_print_pdf"
-                            t-on-click="onPrintPdf">
+                            t-on-click="this.onPrintPdf">
                         <i class="fa fa-file-pdf-o me-1"/>Print PDF
                     </button>
                     <button type="button" class="btn btn-secondary btn-sm o_vn_export_xlsx"
-                            t-on-click="onExportXlsx">
+                            t-on-click="this.onExportXlsx">
                         <i class="fa fa-file-excel-o me-1"/>Export Excel
                     </button>
                     <button type="button" class="btn btn-secondary btn-sm o_vn_edit_filters"
-                            t-on-click="onEditFilters">
+                            t-on-click="this.onEditFilters">
                         <i class="fa fa-sliders me-1"/>Change period
                     </button>
                     <button type="button" class="btn btn-secondary btn-sm o_vn_refresh"
-                            t-on-click="onRefresh">
+                            t-on-click="this.onRefresh">
                         <i class="fa fa-refresh me-1"/>Refresh
                     </button>
 
                     <span class="o_vn_toolbar_divider"/>
 
                     <button type="button" class="btn btn-link btn-sm o_vn_expand_all"
-                            t-on-click="onExpandAll">Expand all</button>
+                            t-on-click="this.onExpandAll">Expand all</button>
                     <button type="button" class="btn btn-link btn-sm o_vn_collapse_all"
-                            t-on-click="onCollapseAll">Collapse all</button>
+                            t-on-click="this.onCollapseAll">Collapse all</button>
 
                     <div class="o_vn_search">
                         <i class="fa fa-search o_vn_search_icon"/>
                         <input type="text" class="form-control form-control-sm o_vn_search_input"
                                placeholder="Search in this report"
-                               t-ref="search" t-on-input="onSearch"/>
+                               t-ref="this.searchRef" t-on-input="this.onSearch"/>
                         <button type="button" class="btn btn-link btn-sm o_vn_search_clear"
-                                title="Clear search" t-on-click="onSearchClear">
+                                title="Clear search" t-on-click="this.onSearchClear">
                             <i class="fa fa-times"/>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div class="o_vn_filter_notice alert alert-info" t-if="state.filtering">
+            <div class="o_vn_filter_notice alert alert-info" t-if="this.state.filtering">
                 Showing matching lines only. The totals below still cover the whole period.
             </div>
 
-            <div class="o_vn_expired" t-if="state.failed">
+            <div class="o_vn_expired" t-if="this.state.failed">
                 <h4>This report is no longer available</h4>
                 <p>
                     Report criteria are held temporarily and have since been cleared.
@@ -61,8 +61,8 @@
                 </p>
             </div>
 
-            <div class="o_vn_report_content" t-if="!state.failed"
-                 t-ref="content" t-on-click="onContentClick" t-out="state.html"/>
+            <div class="o_vn_report_content" t-if="!this.state.failed"
+                 t-ref="this.contentRef" t-on-click="this.onContentClick" t-out="this.state.html"/>
         </div>
     </t>
 

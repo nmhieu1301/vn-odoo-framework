@@ -10,14 +10,20 @@
  * the markup is the report and OWL has nothing to own inside it.
  */
 
-import { Component, markup, onMounted, onPatched, onWillStart, useRef, useState } from "@odoo/owl";
+import { Component, markup, onMounted, onPatched, onWillStart, proxy, signal, useProps } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
+import { standardActionServiceProps } from "@web/webclient/actions/action_plugin";
 
 export class VnReportViewer extends Component {
     static template = "l10n_vn_vas_reports.ReportViewer";
-    static props = ["*"];
+    // Owl 3 ignores a static props schema and the compatibility layer
+    // refuses to build a component that declares one.
+    props = useProps({ ...standardActionServiceProps });
+    // Owl 3 binds t-ref to a signal; read the element as contentRef().
+    contentRef = signal.ref();
+    searchRef = signal.ref();
 
     setup() {
         this.orm = useService("orm");
@@ -29,7 +35,7 @@ export class VnReportViewer extends Component {
         this.wizardId = context.vn_report_wizard_id;
         this.reportName = (this.props.action && this.props.action.name) || _t("Report");
 
-        this.state = useState({
+        this.state = proxy({
             html: markup(""),
             failed: false,
             summary: "",
@@ -40,8 +46,6 @@ export class VnReportViewer extends Component {
         // a different account after a refresh with another period.
         this.collapsed = {};
         this.searchQuery = "";
-        this.contentRef = useRef("content");
-        this.searchRef = useRef("search");
 
         onWillStart(() => this._fetchReport());
         onMounted(() => this._afterRender());
@@ -86,8 +90,8 @@ export class VnReportViewer extends Component {
     }
 
     _rows(selector) {
-        return this.contentRef.el
-            ? [...this.contentRef.el.querySelectorAll(selector)] : [];
+        const content = this.contentRef();
+        return content ? [...content.querySelectorAll(selector)] : [];
     }
 
     _applyCollapsed() {
@@ -242,8 +246,9 @@ export class VnReportViewer extends Component {
     }
 
     onSearchClear() {
-        if (this.searchRef.el) {
-            this.searchRef.el.value = "";
+        const search = this.searchRef();
+        if (search) {
+            search.value = "";
         }
         this.searchQuery = "";
         this.state.filtering = false;
