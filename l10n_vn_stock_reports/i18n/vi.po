@@ -82,8 +82,8 @@ msgstr "Vật tư, hàng hoá"
 
 #. module: l10n_vn_stock_reports
 #: model_terms:ir.ui.view,arch_db:l10n_vn_stock_reports.view_vn_stock_card_wizard_form
-msgid "Quantities and values both come from the stock valuation layers, so the closing value agrees with accounts 152, 155 and 156 by construction."
-msgstr "Số lượng và giá trị đều lấy từ valuation layer, nên giá trị tồn cuối kỳ khớp với các TK 152, 155, 156 theo đúng bản chất."
+msgid "Quantities and values come from the stock moves Odoo valued, so the closing value is the inventory value Odoo itself shows for the date."
+msgstr "Số lượng và giá trị lấy từ các lần nhập xuất Odoo đã định giá, nên giá trị tồn cuối kỳ bằng đúng giá trị tồn kho Odoo tính cho ngày đó."
 
 #. module: l10n_vn_stock_reports
 #: model_terms:ir.ui.view,arch_db:l10n_vn_stock_reports.view_vn_stock_card_wizard_form

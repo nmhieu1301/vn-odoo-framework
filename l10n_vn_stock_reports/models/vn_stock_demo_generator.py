@@ -3,7 +3,7 @@
 """Demo stock movements for the inventory reports.
 
 The accounting demo (``vn.demo.data.generator``) writes journal entries; this
-writes what the stock reports actually read — valuation layers — through the
+writes what the stock reports actually read — valued stock moves — through the
 regular inventory-adjustment flow, with **real-time valuation** wired to the
 Vietnamese accounts so S10-DN has a "TK đối ứng" column worth printing and
 07-VT has issues to allocate.
@@ -119,6 +119,13 @@ class VnStockDemoGenerator(models.AbstractModel):
         """
         location = self.env['stock.warehouse'].search(
             [('company_id', '=', company.id)], limit=1).lot_stock_id
+        # Odoo 20 posts a stock entry only when the location on the other
+        # side carries a valuation account. Opening stock comes in from the
+        # inventory adjustment location; give it 331, the counterpart the
+        # earlier versions' demo printed on S10-DN.
+        adjustment = product.with_company(company).property_stock_inventory
+        if adjustment and not adjustment.valuation_account_id:
+            adjustment.valuation_account_id = self._account(company, 'input_nvl')
         quant = self.env['stock.quant'].with_context(
             inventory_mode=True).create({
                 'product_id': product.id,

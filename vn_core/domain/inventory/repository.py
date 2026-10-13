@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """Inventory repository interface.
 
-Quantity and value both come from the valuation layers, never from a quantity
-source multiplied by a current unit cost. The layer is what Odoo posted to the
-ledger, so a report built on it agrees with account 152/155/156 by construction;
-a report that recomputes value will drift the moment a cost changes.
+Quantity and value both come from what Odoo valued — on 20.0 the stock moves'
+own values — never from a quantity multiplied by a current unit cost, which
+would drift the moment a cost changes.
 """
 
 import abc

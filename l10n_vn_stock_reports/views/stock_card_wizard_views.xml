@@ -28,9 +28,9 @@
                 </group>
 
                 <div class="text-muted" colspan="2">
-                    Quantities and values both come from the stock valuation
-                    layers, so the closing value agrees with accounts 152, 155
-                    and 156 by construction.
+                    Quantities and values come from the stock moves Odoo
+                    valued, so the closing value is the inventory value Odoo
+                    itself shows for the date.
                 </div>
 
                 <footer>

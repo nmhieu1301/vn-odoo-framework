@@ -27,7 +27,11 @@ class ProductDTO(NamedTuple):
 
 
 class InventoryMoveDTO(NamedTuple):
-    """One valuation layer: a quantity and the value that moved with it."""
+    """One valued movement: a quantity and the value that moved with it.
+
+    On 20.0 a stock move, or a standard-cost change carried as a value-only
+    line (``move_id`` None, quantity 0).
+    """
 
     id: int
     date: date
